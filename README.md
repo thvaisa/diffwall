@@ -85,7 +85,16 @@ npm run dev:web      # vite dev server, proxies /api to the node server
 
 ## Dependencies
 
-Runtime: `shiki` (highlighting), `react` + `react-dom` (reconciliation).
+Runtime: `shiki` (highlighting), `react` + `react-dom` (reconciliation),
+`markdown-it` (rendered Markdown view) and `mermaid` (diagrams in Markdown).
 Everything else server-side is Node stdlib. Dev: `vite`,
-`@vitejs/plugin-react`, `typescript`, `@types/*`. Nothing is added without a
-deliberate review of its transitive tree.
+`@vitejs/plugin-react`, `typescript`, `@types/*`.
+
+`mermaid` is large — it pulls ~156 transitive packages, well above the tree's
+original footprint, which is a deliberate exception to the strict dependency
+policy made because rendered `.md` + diagrams is a wanted feature. It is
+**lazy-loaded**: `import("mermaid")` is dynamic, so Vite code-splits it into
+its own chunks that load only when a Markdown file with a ```mermaid block is
+actually viewed — a repo with no such files never downloads it. `markdown-it`
+runs with raw HTML disabled, so untrusted repo Markdown can't inject tags.
+Nothing else is added without a deliberate review of its transitive tree.

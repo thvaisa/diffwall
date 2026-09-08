@@ -20,11 +20,14 @@
     "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit"
   },
   "dependencies": {
+    "markdown-it": "15.0.1",
+    "mermaid": "11.17.2",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "shiki": "4.4.3"
   },
   "devDependencies": {
+    "@types/markdown-it": "14.1.2",
     "@types/node": "26.5.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.7",

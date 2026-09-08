@@ -10,6 +10,7 @@ import { DiffLine, type LineInteract } from "./DiffLine.js";
 import { useFullFile } from "./useFullFile.js";
 import { useLineInteract } from "./useLineInteract.js";
 import { VirtualLines, type VirtualLinesHandle } from "./VirtualLines.js";
+import { MarkdownView } from "./MarkdownView.js";
 import type { RefTray } from "./references.js";
 
 /** Handlers a focused pane registers so App's j/k keys can drive it. */
@@ -322,6 +323,7 @@ function FullBody({
   const { data, loading, error } = useFullFile(file.path, base, file.hash, side, true);
   const vlRef = useRef<VirtualLinesHandle | null>(null);
   const cursor = useRef(-1);
+  const [showSource, setShowSource] = useState(false);
 
   // Collapse consecutive changed lines into regions; navigate between regions.
   const regions = useMemo(() => {
@@ -391,8 +393,35 @@ function FullBody({
   if (loading && !data) return <div className="pane-note">loading file…</div>;
   if (!data) return <div className="pane-note">no content</div>;
 
+  // Markdown files auto-render in full view; a small toggle flips to source.
+  if (isMarkdown(file.path) && !showSource) {
+    return (
+      <div className="md-full">
+        <button
+          className="md-source-toggle"
+          onClick={() => setShowSource(true)}
+          title="show highlighted source instead"
+        >
+          source
+        </button>
+        <div className="pane-body md-scroll">
+          <MarkdownView source={linesToSource(data.lines)} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
+      {isMarkdown(file.path) && (
+        <button
+          className="md-source-toggle inline"
+          onClick={() => setShowSource(false)}
+          title="show rendered markdown instead"
+        >
+          rendered
+        </button>
+      )}
       <VirtualLines
         ref={vlRef}
         lines={data.lines}
@@ -407,6 +436,30 @@ function FullBody({
       )}
     </>
   );
+}
+
+function isMarkdown(path: string): boolean {
+  return /\.(md|markdown)$/i.test(path);
+}
+
+/** Reconstruct plain source text from highlighted full-file lines. */
+function linesToSource(lines: Line[]): string {
+  return lines
+    .filter((l) => l.kind !== LineKind.Del) // new-side only, in order
+    .map((l) => stripTags(l.html))
+    .join("\n");
+}
+
+function stripTags(html: string): string {
+  // Full-file HTML is our own Shiki output (spans) over escaped text. Remove the
+  // tags, then unescape the entities back to raw characters for markdown-it.
+  const noTags = html.replace(/<[^>]+>/g, "");
+  return noTags
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&");
 }
 
 export const Pane = memo(PaneImpl);
