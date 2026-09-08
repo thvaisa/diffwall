@@ -1,6 +1,7 @@
 // Keyboard-shortcut help overlay, toggled with `?`. Purely informational.
 
 const KEYS: [string, string][] = [
+  ["b", "toggle the file tree sidebar"],
   ["f", "freeze / unfreeze polling"],
   ["a", "toggle automatic polling"],
   ["r", "refresh now"],
