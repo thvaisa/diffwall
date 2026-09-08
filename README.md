@@ -73,6 +73,16 @@ npm run dev:web      # vite dev server, proxies /api to the node server
 - `/api/file` and `/api/open` reject any path that resolves outside the repo.
 - Shiki grammars ship with the package; no network at runtime.
 
+## Known limitations
+
+- **Multi-line C++ raw strings with a fake interior delimiter.** Shiki's C++
+  grammar can lose the real terminator of a raw string that spans multiple lines
+  *and* contains a line resembling its own closing delimiter, coloring the rest
+  of the file as string. This is an upstream TextMate-grammar limitation
+  (reproducible with a bare Shiki call), not a diffwall bug. Single-line raw
+  strings, block comments, and nested template angle brackets all highlight
+  correctly.
+
 ## Dependencies
 
 Runtime: `shiki` (highlighting), `react` + `react-dom` (reconciliation).
