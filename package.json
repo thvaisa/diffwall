@@ -1,0 +1,35 @@
+{
+  "name": "diffwall",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local, read-only, browser-based diff wall for watching coding agents work.",
+  "type": "module",
+  "bin": {
+    "diffwall": "dist/server/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:server": "tsc -p tsconfig.server.json",
+    "build:web": "vite build",
+    "build": "npm run build:server && npm run build:web",
+    "dev:server": "npm run build:server && node --watch dist/server/index.js",
+    "dev:web": "vite",
+    "start": "node dist/server/index.js",
+    "typecheck": "tsc -p tsconfig.server.json --noEmit && tsc -p tsconfig.web.json --noEmit"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "shiki": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "26.5.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.7",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "7.0.2",
+    "vite": "8.2.2"
+  }
+}
