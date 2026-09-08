@@ -80,6 +80,17 @@ body {
   color: var(--del-bar);
 }
 
+.toolbar .last-updated {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+
+.toolbar button.frozen {
+  background: #3a2e12;
+  color: #e3b341;
+  border-color: #5a4a1c;
+}
+
 .toolbar label {
   color: var(--text-dim);
   display: inline-flex;
@@ -260,6 +271,39 @@ body {
 .pane.focused {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* Poll-driven flashes: subtle border pulse, non-disruptive. */
+@keyframes flash-changed {
+  0% {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  100% {
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+@keyframes flash-new {
+  0% {
+    border-color: var(--add-bar);
+    box-shadow: 0 0 0 1px var(--add-bar);
+  }
+  100% {
+    border-color: var(--border);
+    box-shadow: none;
+  }
+}
+.pane.flash-changed {
+  animation: flash-changed 1.5s ease-out;
+}
+.pane.flash-new {
+  animation: flash-new 1.5s ease-out;
+}
+/* A focused pane keeps its ring even while flashing. */
+.pane.focused.flash-changed,
+.pane.focused.flash-new {
+  animation: none;
 }
 
 .pane-header .header-main {

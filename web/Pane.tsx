@@ -36,6 +36,8 @@ interface Props {
   focused: boolean;
   onFocus: (path: string) => void;
   tray: RefTray;
+  /** "new" or "changed" from the latest poll; triggers a border flash. */
+  flash?: "new" | "changed" | null;
   /** When focused, register j/k navigation handlers (null to clear). */
   onRegisterNav?: (path: string, nav: PaneNav | null) => void;
 }
@@ -48,6 +50,7 @@ function PaneImpl({
   focused,
   onFocus,
   tray,
+  flash,
   onRegisterNav,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
@@ -56,9 +59,26 @@ function PaneImpl({
   const canFull = !file.binary && !file.error && file.status !== "untracked";
   const effectiveMode: ViewMode = canFull ? mode : "diff";
 
+  // Flash the border briefly when this pane's content changed on a poll. Keyed
+  // on file.hash so a genuine change re-triggers even for the same flash kind.
+  const [flashing, setFlashing] = useState(false);
+  const flashKind = useRef<"new" | "changed" | null>(null);
+  useEffect(() => {
+    if (!flash) return;
+    flashKind.current = flash;
+    setFlashing(true);
+    const id = window.setTimeout(() => setFlashing(false), 1500);
+    return () => window.clearTimeout(id);
+    // file.hash in deps: a new change with the same `flash` value still flashes.
+  }, [flash, file.hash]);
+
+  const flashClass = flashing
+    ? ` flash-${flashKind.current ?? "changed"}`
+    : "";
+
   return (
     <div
-      className={`pane${focused ? " focused" : ""}`}
+      className={`pane${focused ? " focused" : ""}${flashClass}`}
       onMouseDown={() => onFocus(file.path)}
     >
       <div className="pane-header">
