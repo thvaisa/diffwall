@@ -90,11 +90,10 @@ function PaneImpl({
     [file.path, onSetHeight],
   );
 
-  const canFull =
-    !file.binary &&
-    !file.error &&
-    !file.special &&
-    file.status !== FileStatus.Untracked;
+  // Untracked files CAN have a full view — their content is on disk and
+  // /api/file reads it. This matters for agent-created files (e.g. a new .md),
+  // which are untracked but exactly what you want to read rendered.
+  const canFull = !file.binary && !file.error && !file.special;
   const effectiveMode: ViewMode = canFull ? mode : ViewMode.Diff;
 
   // Flash the border briefly when this pane's content changed on a poll. Keyed
