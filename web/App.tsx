@@ -144,8 +144,15 @@ export function App() {
     [orderedFiles, columnCount],
   );
 
+  // Markdown files default to full view (rendered preview) unless the user has
+  // explicitly overridden the mode for that path.
   const modeFor = useCallback(
-    (path: string): ViewMode => modes[path] ?? defaultMode,
+    (path: string): ViewMode => {
+      const override = modes[path];
+      if (override) return override;
+      if (/\.(md|markdown)$/i.test(path)) return ViewMode.Full;
+      return defaultMode;
+    },
     [modes, defaultMode],
   );
 
