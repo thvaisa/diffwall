@@ -112,6 +112,40 @@ export async function repoState(cwd: string): Promise<RepoState> {
   };
 }
 
+export interface RefList {
+  branches: string[];
+  tags: string[];
+  head: string; // always available: diff against the last commit
+}
+
+/**
+ * List local branches and tags for the base picker. Read-only. `HEAD` is always
+ * offered. Sorted by most-recent commit so the active branches surface first.
+ */
+export async function listRefs(cwd: string): Promise<RefList> {
+  const branchesRes = await git(cwd, [
+    "for-each-ref",
+    "--sort=-committerdate",
+    "--format=%(refname:short)",
+    "refs/heads",
+  ]);
+  const tagsRes = await git(cwd, [
+    "for-each-ref",
+    "--sort=-creatordate",
+    "--format=%(refname:short)",
+    "refs/tags",
+  ]);
+  const split = (r: GitResult): string[] =>
+    r.code === 0
+      ? r.stdout
+          .toString("utf8")
+          .split("\n")
+          .map((s) => s.trim())
+          .filter((s) => s !== "")
+      : [];
+  return { branches: split(branchesRes), tags: split(tagsRes), head: "HEAD" };
+}
+
 // ---- Raw diff / numstat / name-status collection ------------------------------
 
 export interface NumstatEntry {

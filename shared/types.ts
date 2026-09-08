@@ -118,6 +118,12 @@ export interface HealthResponse {
   pid: number;
 }
 
+export interface RefsResponse {
+  branches: string[];
+  tags: string[];
+  head: string;
+}
+
 export interface OpenRequest {
   path: string;
   line: number;

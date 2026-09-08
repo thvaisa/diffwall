@@ -39,6 +39,10 @@ interface Props {
   tray: RefTray;
   /** "new" or "changed" from the latest poll; triggers a border flash. */
   flash?: ChangeKind | null;
+  /** Manual pane height in px, or undefined for content-sized. */
+  height?: number;
+  onSetHeight?: (path: string, h: number) => void;
+  onClearHeight?: (path: string) => void;
   /** When focused, register j/k navigation handlers (null to clear). */
   onRegisterNav?: (path: string, nav: PaneNav | null) => void;
 }
@@ -52,10 +56,38 @@ function PaneImpl({
   onFocus,
   tray,
   flash,
+  height,
+  onSetHeight,
+  onClearHeight,
   onRegisterNav,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const interact = useLineInteract(file, tray);
+  const paneRef = useRef<HTMLDivElement | null>(null);
+
+  // Drag the bottom edge to set an explicit height; double-click clears it.
+  const resizeDrag = useRef<{ startY: number; startH: number } | null>(null);
+  const onResizeDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const h = paneRef.current?.getBoundingClientRect().height ?? 200;
+      resizeDrag.current = { startY: e.clientY, startH: h };
+      const move = (ev: MouseEvent) => {
+        const d = resizeDrag.current;
+        if (!d) return;
+        onSetHeight?.(file.path, d.startH + (ev.clientY - d.startY));
+      };
+      const up = () => {
+        resizeDrag.current = null;
+        window.removeEventListener("mousemove", move);
+        window.removeEventListener("mouseup", up);
+      };
+      window.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", up);
+    },
+    [file.path, onSetHeight],
+  );
 
   const canFull =
     !file.binary && !file.error && file.status !== FileStatus.Untracked;
@@ -80,7 +112,11 @@ function PaneImpl({
 
   return (
     <div
-      className={`pane${focused ? " focused" : ""}${flashClass}`}
+      ref={paneRef}
+      className={`pane${focused ? " focused" : ""}${flashClass}${
+        collapsed ? " collapsed" : ""
+      }`}
+      style={height && !collapsed ? { height } : undefined}
       onMouseDown={() => onFocus(file.path)}
     >
       <div className="pane-header">
@@ -117,19 +153,31 @@ function PaneImpl({
         )}
       </div>
 
-      {!collapsed &&
-        (effectiveMode === ViewMode.Full ? (
-          <FullBody
-            file={file}
-            base={base}
-            focused={focused}
-            path={file.path}
-            interact={interact}
-            onRegisterNav={onRegisterNav}
-          />
-        ) : (
-          <DiffBody file={file} base={base} interact={interact} />
-        ))}
+      {!collapsed && (
+        <div className="pane-content">
+          {effectiveMode === ViewMode.Full ? (
+            <FullBody
+              file={file}
+              base={base}
+              focused={focused}
+              path={file.path}
+              interact={interact}
+              onRegisterNav={onRegisterNav}
+            />
+          ) : (
+            <DiffBody file={file} base={base} interact={interact} />
+          )}
+        </div>
+      )}
+
+      {!collapsed && (
+        <div
+          className="pane-resize"
+          title="drag to resize · double-click to auto-size"
+          onMouseDown={onResizeDown}
+          onDoubleClick={() => onClearHeight?.(file.path)}
+        />
+      )}
     </div>
   );
 }

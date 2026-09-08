@@ -1,8 +1,7 @@
-// Milestone 6: live. Polls /api/diff on an interval, flashes only the panes that
-// changed, preserves everything else (scroll, view mode) via keyed reconciliation,
-// freezes on demand with a pending-change count, sorts by path or recency, and
-// reconnects with backoff when the server dies. Interval + freeze + sort are in
-// the toolbar and persist.
+// Milestone 7: resize + persistence. Adds draggable column splitters (flex
+// ratios) and per-pane height resize, a base-ref combobox, a help overlay, and
+// URL-query mirroring of all settings so a view is bookmarkable and each tab can
+// hold its own config. Builds on M6's live polling.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SortMode, ViewMode } from "../shared/types.js";
@@ -13,29 +12,40 @@ import { loadJson, saveJson } from "./persist.js";
 import { useReferences } from "./references.js";
 import { RefTray } from "./RefTray.js";
 import { useDiffPoll } from "./useDiffPoll.js";
+import { useColumnWidths } from "./useColumnWidths.js";
+import { usePaneHeights } from "./usePaneHeights.js";
+import { readUrlSettings, useUrlSync } from "./useUrlState.js";
+import { BaseSelect } from "./BaseSelect.js";
+import { HelpOverlay } from "./HelpOverlay.js";
 
 export function App() {
-  const [base, setBase] = useState("HEAD");
-  const [columnCount, setColumnCount] = useState(() =>
-    loadJson<number>("columns", 3),
+  // URL query overrides localStorage on first load (bookmarkable / per-tab).
+  const url = readUrlSettings();
+
+  const [base, setBase] = useState(url.base ?? "HEAD");
+  const [columnCount, setColumnCount] = useState(
+    () => url.columns ?? loadJson<number>("columns", 3),
   );
   const [context] = useState(3);
   const [untracked] = useState(true);
-  const [intervalMs, setIntervalMs] = useState(() =>
-    loadJson<number>("interval", 2000),
+  const [intervalMs, setIntervalMs] = useState(
+    () => url.interval ?? loadJson<number>("interval", 2000),
   );
-  const [autoPoll, setAutoPoll] = useState(() =>
-    loadJson<boolean>("autoPoll", true),
+  const [autoPoll, setAutoPoll] = useState(
+    () => url.auto ?? loadJson<boolean>("autoPoll", true),
   );
   const [frozen, setFrozen] = useState(false);
-  const [sortMode, setSortMode] = useState<SortMode>(() =>
-    loadJson<SortMode>("sort", SortMode.Path),
+  const [sortMode, setSortMode] = useState<SortMode>(
+    () => (url.sort as SortMode) ?? loadJson<SortMode>("sort", SortMode.Path),
   );
   const [defaultMode, setDefaultMode] = useState<ViewMode>(() => {
-    const q = new URLSearchParams(location.search).get("view");
-    if (q === ViewMode.Full || q === ViewMode.Diff) return q;
+    if (url.view === ViewMode.Full || url.view === ViewMode.Diff) return url.view;
     return loadJson<ViewMode>("defaultMode", ViewMode.Diff);
   });
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  const columnWidths = useColumnWidths(columnCount);
+  const paneHeights = usePaneHeights();
 
   const [modes, setModes] = useState<Record<string, ViewMode>>(() =>
     loadJson<Record<string, ViewMode>>("modes", {}),
@@ -50,6 +60,17 @@ export function App() {
   useEffect(() => saveJson("interval", intervalMs), [intervalMs]);
   useEffect(() => saveJson("sort", sortMode), [sortMode]);
   useEffect(() => saveJson("autoPoll", autoPoll), [autoPoll]);
+
+  // Mirror settings into the URL so a configured view is bookmarkable and each
+  // tab can carry its own config independent of shared localStorage.
+  useUrlSync({
+    base,
+    columns: columnCount,
+    view: defaultMode,
+    sort: sortMode,
+    interval: intervalMs,
+    auto: autoPoll,
+  });
 
   const params = useMemo(
     () => ({ base, context, untracked, whitespace: false }),
@@ -181,6 +202,12 @@ export function App() {
           e.preventDefault();
           baseInputRef.current?.focus();
           break;
+        case "?":
+          setHelpOpen((v) => !v);
+          break;
+        case "Escape":
+          setHelpOpen(false);
+          break;
         default:
           if (e.key >= "1" && e.key <= "6") setColumnCount(Number(e.key));
       }
@@ -196,13 +223,7 @@ export function App() {
 
         <label>
           base
-          <input
-            ref={baseInputRef}
-            className="base-input"
-            value={base}
-            onChange={(e) => setBase(e.target.value)}
-            spellCheck={false}
-          />
+          <BaseSelect value={base} onChange={setBase} inputRef={baseInputRef} />
         </label>
 
         <label>
@@ -287,6 +308,13 @@ export function App() {
           </span>
         )}
         <LastUpdated at={lastUpdated} />
+        <button
+          className="help-btn"
+          onClick={() => setHelpOpen((v) => !v)}
+          title="keyboard & mouse help (?)"
+        >
+          ?
+        </button>
       </div>
 
       {!connected && (
@@ -306,36 +334,53 @@ export function App() {
             No changes against <code>{data.base}</code>.
           </div>
         ) : (
-          <div className="columns">
+          <div className="columns" ref={columnWidths.containerRef}>
             {columns.map((col, ci) => (
-              <div
-                key={ci}
-                className="column"
-                style={{ flex: `1 1 ${100 / columnCount}%` }}
-              >
-                {col.map((file) => (
-                  <Pane
-                    key={file.path}
-                    file={file}
-                    base={data!.base}
-                    mode={modeFor(file.path)}
-                    onToggleMode={toggleMode}
-                    focused={focused === file.path}
-                    onFocus={setFocused}
-                    tray={tray}
-                    flash={changed.get(file.path) ?? null}
-                    onRegisterNav={registerNav}
+              <FragmentColumn key={ci}>
+                <div
+                  className="column"
+                  style={{ flex: `${columnWidths.ratios[ci] ?? 1 / columnCount} 1 0` }}
+                >
+                  {col.map((file) => (
+                    <Pane
+                      key={file.path}
+                      file={file}
+                      base={data!.base}
+                      mode={modeFor(file.path)}
+                      onToggleMode={toggleMode}
+                      focused={focused === file.path}
+                      onFocus={setFocused}
+                      tray={tray}
+                      flash={changed.get(file.path) ?? null}
+                      height={paneHeights.get(file.path)}
+                      onSetHeight={paneHeights.set}
+                      onClearHeight={paneHeights.clear}
+                      onRegisterNav={registerNav}
+                    />
+                  ))}
+                </div>
+                {ci < columns.length - 1 && (
+                  <div
+                    className="col-splitter"
+                    title="drag to resize columns"
+                    onMouseDown={(e) => columnWidths.onSplitterDown(ci, e)}
                   />
-                ))}
-              </div>
+                )}
+              </FragmentColumn>
             ))}
           </div>
         )}
       </div>
 
       <RefTray tray={tray} />
+      {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
     </div>
   );
+}
+
+// A keyed fragment wrapper so a column + its splitter share one list key.
+function FragmentColumn({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
 }
 
 // Poll-interval field. Holds free text while editing (so you can clear it and

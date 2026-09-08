@@ -91,6 +91,96 @@ body {
   border-color: #5a4a1c;
 }
 
+.toolbar button.help-btn {
+  width: 24px;
+  padding: 3px 0;
+  font-weight: 600;
+}
+
+/* ---- Help overlay ---------------------------------------------------- */
+
+.help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.help-card {
+  background: var(--bg-pane);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 16px 20px;
+  max-width: 720px;
+  width: 90%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.help-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+.help-head button {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 20px;
+  cursor: pointer;
+  line-height: 1;
+}
+.help-head button:hover {
+  color: var(--text);
+}
+.help-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.help-cols h4 {
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.help-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 2px 0;
+  font-size: 12px;
+}
+.help-row kbd {
+  flex: 0 0 auto;
+  min-width: 46px;
+  font-family: var(--font-mono);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent);
+  text-align: center;
+}
+.help-row .help-gesture {
+  flex: 0 0 auto;
+  min-width: 120px;
+  font-family: var(--font-mono);
+  color: var(--accent);
+}
+.help-foot {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 11px;
+  text-align: center;
+}
+
 .toolbar label {
   color: var(--text-dim);
   display: inline-flex;
@@ -193,6 +283,45 @@ body {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+/* When a manual height is set, the header stays put and the body scrolls. */
+.pane-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.pane-content > * {
+  min-height: 0;
+}
+
+/* Bottom-edge resize handle. */
+.pane-resize {
+  height: 6px;
+  flex: 0 0 auto;
+  cursor: ns-resize;
+  background: transparent;
+}
+.pane-resize:hover {
+  background: var(--accent);
+  opacity: 0.4;
+}
+
+/* Column resize splitter. */
+.col-splitter {
+  flex: 0 0 auto;
+  width: 8px;
+  margin: 0 -1px;
+  cursor: ew-resize;
+  align-self: stretch;
+}
+.col-splitter:hover {
+  background: var(--accent);
+  opacity: 0.35;
+  border-radius: 3px;
 }
 
 .pane-header {

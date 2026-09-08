@@ -12,8 +12,9 @@ import type {
   FileResponse,
   HealthResponse,
   OpenResponse,
+  RefsResponse,
 } from "../shared/types.js";
-import { refExists, repoRoot as resolveRepoRoot } from "./git.js";
+import { listRefs, refExists, repoRoot as resolveRepoRoot } from "./git.js";
 import { buildDiffResponse, buildFileResponse, type BuildOptions } from "./buildDiff.js";
 
 interface Cli {
@@ -207,6 +208,13 @@ async function handle(
 
   if (path === "/api/health") {
     const body: HealthResponse = { ok: true, repo: root, pid: process.pid };
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (path === "/api/refs") {
+    const refs = await listRefs(root);
+    const body: RefsResponse = refs;
     sendJson(res, 200, body);
     return;
   }
