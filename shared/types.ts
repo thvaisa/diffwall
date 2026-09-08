@@ -3,6 +3,8 @@
 
 export type LineKind = "ctx" | "add" | "del";
 
+export type ViewMode = "diff" | "full";
+
 export type FileStatus =
   | "modified"
   | "added"

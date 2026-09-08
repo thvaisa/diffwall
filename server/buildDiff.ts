@@ -305,7 +305,7 @@ export async function buildFileResponse(
   path: string,
   side: "new" | "old",
 ): Promise<FileResponse> {
-  const { repoRoot, base, context, whitespace, theme } = opts;
+  const { repoRoot, base, whitespace, theme } = opts;
   const lang = langLabel(path);
 
   // For the old side (deleted file view) just render old content straight.
@@ -322,96 +322,68 @@ export async function buildFileResponse(
     return { path, lang, truncated: cap.truncated, lines };
   }
 
-  // New side: whole new file, with deleted lines spliced in at diff positions.
+  // New side: whole new file with deleted lines spliced in. We walk the full
+  // diff to get exact old/new numbering, and fill unchanged regions (which the
+  // diff omits with only U<context> lines shown) from the highlighted new file.
   const newContent = (await readNewContent(repoRoot, path)) ?? "";
   const cap = capLines(newContent, MAX_FULL_FILE_LINES);
   const newHi = await highlightFile(cap.content, path, theme);
+  const newTotal = newHi.length;
 
-  // Diff to learn which new lines are additions and where deletions sit.
+  // A full-context diff makes reconstruction exact and simple: every new line
+  // and every deletion is present with correct numbers, no gaps to fill.
   let rawDiff = "";
   try {
-    rawDiff = await diffFile(repoRoot, base, path, context, whitespace);
+    rawDiff = await diffFile(repoRoot, base, path, MAX_FULL_FILE_LINES, whitespace);
   } catch {
     rawDiff = "";
   }
   const parsed = parseUnifiedDiff(rawDiff, Number.MAX_SAFE_INTEGER);
 
-  // Classify each new-file line and collect deletions keyed by the new line
-  // number they should appear *before*.
-  const addedNew = new Set<number>();
-  const delsBefore = new Map<number, { old: number; text: string }[]>();
-  for (const h of parsed.hunks) {
-    let pendingDels: { old: number; text: string }[] = [];
-    for (const l of h.lines) {
-      if (l.kind === "add") {
-        if (l.new != null) addedNew.add(l.new);
-        // A deletion block immediately followed by adds attaches before the add.
-        if (pendingDels.length && l.new != null) {
-          const arr = delsBefore.get(l.new) ?? [];
-          arr.push(...pendingDels);
-          delsBefore.set(l.new, arr);
-          pendingDels = [];
-        }
-      } else if (l.kind === "del") {
-        if (l.old != null) pendingDels.push({ old: l.old, text: l.text });
-      } else {
-        // ctx: flush pending dels before this context line's new number.
-        if (pendingDels.length && l.new != null) {
-          const arr = delsBefore.get(l.new) ?? [];
-          arr.push(...pendingDels);
-          delsBefore.set(l.new, arr);
-          pendingDels = [];
-        }
-      }
-    }
-    // Trailing deletions at end of hunk: attach after the last new line.
-    if (pendingDels.length) {
-      const after = (parsed.hunks, Number.MAX_SAFE_INTEGER);
-      const arr = delsBefore.get(after) ?? [];
-      arr.push(...pendingDels);
-      delsBefore.set(after, arr);
-    }
-  }
-
-  // Highlight old content once for deleted-line HTML.
+  // Highlight old content once, for deleted-line HTML.
   const oldContent = await showOld(repoRoot, base, path);
   const oldHi = oldContent != null ? await highlightFile(oldContent, path, theme) : null;
 
   const lines: DiffLine[] = [];
-  for (let n = 1; n <= newHi.length; n++) {
-    // Splice any deletions that belong before this new line.
-    const dels = delsBefore.get(n);
-    if (dels) {
-      for (const d of dels) {
+
+  if (parsed.hunks.length === 0) {
+    // No diff (identical, or diff failed): render the new file as pure context.
+    for (let n = 1; n <= newTotal; n++) {
+      lines.push({ kind: "ctx", old: n, new: n, html: newHi[n - 1] ?? "" });
+    }
+    return { path, lang, truncated: cap.truncated, lines };
+  }
+
+  // With full context there is a single hunk covering the file. Emit its lines
+  // in order; each already carries exact old/new numbers. Re-key `html` to the
+  // highlighted whole-file lines (add/ctx from new, del from old).
+  let coveredNew = 0;
+  for (const h of parsed.hunks) {
+    for (const l of h.lines) {
+      if (l.kind === "del") {
         lines.push({
           kind: "del",
-          old: d.old,
+          old: l.old,
           new: null,
-          html: (oldHi && oldHi[d.old - 1]) ?? escapeHtml(d.text),
+          html: (l.old != null && oldHi ? oldHi[l.old - 1] : undefined) ?? escapeHtml(l.text),
+        });
+      } else {
+        const nn = l.new;
+        if (nn != null) coveredNew = nn;
+        lines.push({
+          kind: l.kind,
+          old: l.old,
+          new: nn,
+          html: (nn != null ? newHi[nn - 1] : undefined) ?? escapeHtml(l.text),
         });
       }
     }
-    lines.push({
-      kind: addedNew.has(n) ? "add" : "ctx",
-      // TODO(M4): track true old-side numbering across the whole file. For diff
-      // view (M1) old numbers come straight from the hunk and are exact; this
-      // approximation only affects full-file view's context gutter.
-      old: addedNew.has(n) ? null : n,
-      new: n,
-      html: newHi[n - 1] ?? "",
-    });
   }
-  // Trailing deletions.
-  const trailing = delsBefore.get(Number.MAX_SAFE_INTEGER);
-  if (trailing) {
-    for (const d of trailing) {
-      lines.push({
-        kind: "del",
-        old: d.old,
-        new: null,
-        html: (oldHi && oldHi[d.old - 1]) ?? escapeHtml(d.text),
-      });
-    }
+
+  // If the file was capped below the diff's reach, any remaining new lines are
+  // unchanged tail context; append them so the view still covers the whole file.
+  for (let n = coveredNew + 1; n <= newTotal; n++) {
+    lines.push({ kind: "ctx", old: null, new: n, html: newHi[n - 1] ?? "" });
   }
 
   return { path, lang, truncated: cap.truncated, lines };

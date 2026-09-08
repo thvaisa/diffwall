@@ -1,10 +1,19 @@
-// One file's pane: header (status dot, path, counts, tag) and a diff body of
-// hunks. Header click collapses/expands. Milestone 2 is diff-view only, no
-// highlighting toggle, no resize, no polling — those arrive in later milestones.
+// One file's pane. Two view modes:
+//   diff — hunks only, with clickable gap separators that expand skipped lines
+//   full — the whole file, virtualized, changed lines marked in place
+// Mode is owned by App (persisted per path) and passed in with a toggle.
 
-import { memo, useState } from "react";
-import type { FileDiff } from "../shared/types.js";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { DiffLine as Line, FileDiff, ViewMode } from "../shared/types.js";
 import { DiffLine } from "./DiffLine.js";
+import { useFullFile } from "./useFullFile.js";
+import { VirtualLines, type VirtualLinesHandle } from "./VirtualLines.js";
+
+/** Handlers a focused pane registers so App's j/k keys can drive it. */
+export interface PaneNav {
+  next: () => void;
+  prev: () => void;
+}
 
 const STATUS_TAG: Record<string, string> = {
   modified: "M",
@@ -15,25 +24,54 @@ const STATUS_TAG: Record<string, string> = {
   typechange: "T",
 };
 
+const ROW_HEIGHT = 17; // must match .line height in CSS (12px * 1.45 ≈ 17.4, floored)
+
 interface Props {
   file: FileDiff;
+  base: string;
+  mode: ViewMode;
+  onToggleMode: (path: string) => void;
+  focused: boolean;
+  onFocus: (path: string) => void;
+  /** When focused, register j/k navigation handlers (null to clear). */
+  onRegisterNav?: (path: string, nav: PaneNav | null) => void;
 }
 
-function PaneImpl({ file }: Props) {
+function PaneImpl({
+  file,
+  base,
+  mode,
+  onToggleMode,
+  focused,
+  onFocus,
+  onRegisterNav,
+}: Props) {
   const [collapsed, setCollapsed] = useState(false);
 
+  const canFull = !file.binary && !file.error && file.status !== "untracked";
+  const effectiveMode: ViewMode = canFull ? mode : "diff";
+
   return (
-    <div className="pane">
-      <div className="pane-header" onClick={() => setCollapsed((c) => !c)}>
-        <span className={`status-dot status-${file.status}`} />
-        <span className="path" title={file.path}>
-          {file.oldPath && (
-            <>
-              <span className="old-path">{file.oldPath}</span>
-              {" → "}
-            </>
-          )}
-          {file.path}
+    <div
+      className={`pane${focused ? " focused" : ""}`}
+      onMouseDown={() => onFocus(file.path)}
+    >
+      <div className="pane-header">
+        <span
+          className="header-main"
+          onClick={() => setCollapsed((c) => !c)}
+          title="collapse / expand"
+        >
+          <span className={`status-dot status-${file.status}`} />
+          <span className="path" title={file.path}>
+            {file.oldPath && (
+              <>
+                <span className="old-path">{file.oldPath}</span>
+                {" → "}
+              </>
+            )}
+            {file.path}
+          </span>
         </span>
         <span className="counts">
           {file.added > 0 && <span className="add">+{file.added}</span>}
@@ -41,34 +79,89 @@ function PaneImpl({ file }: Props) {
           {file.removed > 0 && <span className="del">−{file.removed}</span>}
         </span>
         <span className="tag">{STATUS_TAG[file.status] ?? "?"}</span>
+        {canFull && (
+          <button
+            className="mode-toggle"
+            onClick={() => onToggleMode(file.path)}
+            title="toggle diff / full-file view (e)"
+          >
+            {effectiveMode === "diff" ? "diff" : "full"}
+          </button>
+        )}
       </div>
 
-      {!collapsed && <PaneBody file={file} />}
+      {!collapsed &&
+        (effectiveMode === "full" ? (
+          <FullBody
+            file={file}
+            base={base}
+            focused={focused}
+            path={file.path}
+            onRegisterNav={onRegisterNav}
+          />
+        ) : (
+          <DiffBody file={file} base={base} />
+        ))}
     </div>
   );
 }
 
-function PaneBody({ file }: { file: FileDiff }) {
-  if (file.error) {
-    return <div className="pane-note error">error: {file.error}</div>;
-  }
-  if (file.binary) {
-    return <div className="pane-note">binary file — no text diff</div>;
-  }
-  if (file.hunks.length === 0) {
-    return <div className="pane-note">no changes to show</div>;
-  }
+// ---- Diff view with gap expansion --------------------------------------------
+
+function DiffBody({ file, base }: { file: FileDiff; base: string }) {
+  // Gaps the user has expanded, keyed by the hunk index they precede.
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
+  const needFull = expanded.size > 0;
+  const side = file.status === "deleted" ? "old" : "new";
+  const full = useFullFile(file.path, base, file.hash, side, needFull);
+
+  if (file.error) return <div className="pane-note error">error: {file.error}</div>;
+  if (file.binary) return <div className="pane-note">binary file — no text diff</div>;
+  if (file.hunks.length === 0) return <div className="pane-note">no changes to show</div>;
+
+  // New-line index by which we look up full-file lines (1-based new numbers).
+  const fullByNew = full.data
+    ? indexByNew(full.data.lines)
+    : null;
 
   return (
-    <div className="pane-body">
-      {file.hunks.map((h, hi) => (
-        <div key={hi}>
-          <div className="hunk-header">{h.header}</div>
-          {h.lines.map((line, li) => (
-            <DiffLine key={li} line={line} />
-          ))}
-        </div>
-      ))}
+    <div className="pane-body diff">
+      {file.hunks.map((h, hi) => {
+        const prev = hi > 0 ? file.hunks[hi - 1] : null;
+        const prevEndNew = prev ? lastNew(prev) : 0;
+        const thisStartNew = h.newStart;
+        const gap = thisStartNew - prevEndNew - 1;
+        const showGap = gap > 0;
+        const isOpen = expanded.has(hi);
+
+        return (
+          <div key={hi}>
+            {showGap && !isOpen && (
+              <div
+                className="gap"
+                onClick={() => setExpanded((s) => new Set(s).add(hi))}
+                title="expand skipped lines"
+              >
+                ⋯ {gap} unchanged line{gap === 1 ? "" : "s"}
+              </div>
+            )}
+            {showGap && isOpen && fullByNew && (
+              <GapLines
+                lines={fullByNew}
+                fromNew={prevEndNew + 1}
+                toNew={thisStartNew - 1}
+              />
+            )}
+            {showGap && isOpen && !fullByNew && (
+              <div className="gap loading">loading skipped lines…</div>
+            )}
+            <div className="hunk-header">{h.header}</div>
+            {h.lines.map((line, li) => (
+              <DiffLine key={li} line={line} />
+            ))}
+          </div>
+        );
+      })}
       {file.truncated && (
         <div className="pane-note truncated">
           diff truncated at the per-file line cap
@@ -78,4 +171,131 @@ function PaneBody({ file }: { file: FileDiff }) {
   );
 }
 
+function GapLines({
+  lines,
+  fromNew,
+  toNew,
+}: {
+  lines: Map<number, Line>;
+  fromNew: number;
+  toNew: number;
+}) {
+  const out: Line[] = [];
+  for (let n = fromNew; n <= toNew; n++) {
+    const l = lines.get(n);
+    if (l) out.push(l);
+  }
+  return (
+    <>
+      {out.map((line, i) => (
+        <DiffLine key={i} line={line} />
+      ))}
+    </>
+  );
+}
+
+function indexByNew(lines: Line[]): Map<number, Line> {
+  const m = new Map<number, Line>();
+  for (const l of lines) {
+    if (l.new != null) m.set(l.new, l);
+  }
+  return m;
+}
+
+function lastNew(h: FileDiff["hunks"][number]): number {
+  for (let i = h.lines.length - 1; i >= 0; i--) {
+    const n = h.lines[i]!.new;
+    if (n != null) return n;
+  }
+  return h.newStart;
+}
+
+// ---- Full-file view (virtualized) --------------------------------------------
+
+function FullBody({
+  file,
+  base,
+  focused,
+  path,
+  onRegisterNav,
+}: {
+  file: FileDiff;
+  base: string;
+  focused: boolean;
+  path: string;
+  onRegisterNav?: (path: string, nav: PaneNav | null) => void;
+}) {
+  const side = file.status === "deleted" ? "old" : "new";
+  const { data, loading, error } = useFullFile(file.path, base, file.hash, side, true);
+  const vlRef = useRef<VirtualLinesHandle | null>(null);
+  const cursor = useRef(-1);
+
+  // Collapse consecutive changed lines into regions; navigate between regions.
+  const regions = useMemo(() => {
+    if (!data) return [];
+    const out: number[] = [];
+    let prev = -2;
+    data.lines.forEach((l, i) => {
+      if (l.kind !== "ctx") {
+        if (i !== prev + 1) out.push(i); // start of a new region
+        prev = i;
+      }
+    });
+    return out;
+  }, [data]);
+
+  const changedRows = useMemo(() => {
+    if (!data) return [];
+    const rows: number[] = [];
+    data.lines.forEach((l, i) => {
+      if (l.kind !== "ctx") rows.push(i);
+    });
+    return rows;
+  }, [data]);
+
+  // Register j/k handlers with App while this pane is focused.
+  const jump = useCallback(
+    (delta: number) => {
+      if (regions.length === 0) return;
+      cursor.current = Math.max(
+        0,
+        Math.min(regions.length - 1, cursor.current + delta),
+      );
+      const target = regions[cursor.current] ?? 0;
+      vlRef.current?.scrollToIndex(Math.max(0, target - 2));
+    },
+    [regions],
+  );
+
+  useEffect(() => {
+    if (!focused || !onRegisterNav) return;
+    onRegisterNav(path, {
+      next: () => jump(1),
+      prev: () => jump(-1),
+    });
+    return () => onRegisterNav(path, null);
+  }, [focused, onRegisterNav, path, jump]);
+
+  if (error) return <div className="pane-note error">error: {error}</div>;
+  if (loading && !data) return <div className="pane-note">loading file…</div>;
+  if (!data) return <div className="pane-note">no content</div>;
+
+  return (
+    <>
+      <VirtualLines
+        ref={vlRef}
+        lines={data.lines}
+        rowHeight={ROW_HEIGHT}
+        changedRows={changedRows}
+      />
+      {data.truncated && (
+        <div className="pane-note truncated">
+          file truncated at 20,000 lines
+        </div>
+      )}
+    </>
+  );
+}
+
 export const Pane = memo(PaneImpl);
+export type { Line };

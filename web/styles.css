@@ -257,11 +257,95 @@ body {
   letter-spacing: 0.03em;
 }
 
+.pane.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.pane-header .header-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.pane-header .mode-toggle {
+  flex: 0 0 auto;
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.pane-header .mode-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
 .pane-body {
   overflow: auto;
   font-family: var(--font-mono);
   font-size: var(--fs);
   line-height: var(--line-h);
+}
+
+.pane-body.full {
+  overflow: auto;
+}
+
+.full-wrap {
+  position: relative;
+  display: flex;
+}
+.full-wrap .pane-body.full {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Gap separator between hunks in diff mode. */
+.gap {
+  color: var(--text-dim);
+  background: rgba(88, 166, 255, 0.04);
+  padding: 1px 8px 1px 4.2em;
+  cursor: pointer;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.gap:hover {
+  background: rgba(88, 166, 255, 0.1);
+  color: var(--text);
+}
+.gap.loading {
+  cursor: default;
+}
+
+/* Change minimap strip alongside a full-file view. */
+.minimap {
+  position: relative;
+  flex: 0 0 auto;
+  width: 8px;
+  background: var(--bg);
+  border-left: 1px solid var(--border);
+}
+.minimap .tick {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  height: 2px;
+}
+.minimap .tick-add {
+  background: var(--add-bar);
+}
+.minimap .tick-del {
+  background: var(--del-bar);
 }
 
 .pane-note {
