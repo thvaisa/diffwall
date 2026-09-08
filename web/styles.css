@@ -427,3 +427,118 @@ body {
   min-width: 0;
   padding-right: 8px;
 }
+
+/* ---- Line references -------------------------------------------------- */
+
+.gutter.refable {
+  cursor: pointer;
+}
+.gutter.refable:hover {
+  background: rgba(88, 166, 255, 0.18);
+  color: var(--accent);
+}
+
+.line.selected {
+  background: rgba(88, 166, 255, 0.16);
+}
+
+.line {
+  position: relative;
+}
+
+.open-icon {
+  display: none;
+  position: absolute;
+  right: 2px;
+  top: 0;
+  height: 100%;
+  padding: 0 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 11px;
+}
+.line:hover .open-icon {
+  display: inline;
+}
+.open-icon:hover {
+  color: var(--accent);
+}
+
+.ref-flash {
+  position: absolute;
+  right: 22px;
+  top: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 10px;
+  color: var(--bg);
+  background: var(--accent);
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+/* ---- Reference tray -------------------------------------------------- */
+
+.ref-tray {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-header);
+  border-top: 1px solid var(--border);
+  max-height: 96px;
+  overflow-y: auto;
+}
+.ref-tray-label {
+  color: var(--text-dim);
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+}
+.ref-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 3px 1px 6px;
+  color: var(--text);
+}
+.ref-chip-x {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+}
+.ref-chip-x:hover {
+  color: var(--del-bar);
+}
+.ref-tray button {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.ref-tray button:hover {
+  border-color: var(--border-strong);
+}

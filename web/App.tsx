@@ -9,6 +9,8 @@ import { fetchDiff } from "./api.js";
 import { assignColumns } from "./layout.js";
 import { Pane, type PaneNav } from "./Pane.js";
 import { loadJson, saveJson } from "./persist.js";
+import { useReferences } from "./references.js";
+import { RefTray } from "./RefTray.js";
 
 export function App() {
   const [base, setBase] = useState("HEAD");
@@ -33,6 +35,8 @@ export function App() {
   const [data, setData] = useState<DiffResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const tray = useReferences();
 
   useEffect(() => saveJson("columns", columnCount), [columnCount]);
   useEffect(() => saveJson("defaultMode", defaultMode), [defaultMode]);
@@ -245,6 +249,7 @@ export function App() {
                     onToggleMode={toggleMode}
                     focused={focused === file.path}
                     onFocus={setFocused}
+                    tray={tray}
                     onRegisterNav={registerNav}
                   />
                 ))}
@@ -253,6 +258,8 @@ export function App() {
           </div>
         )}
       </div>
+
+      <RefTray tray={tray} />
     </div>
   );
 }

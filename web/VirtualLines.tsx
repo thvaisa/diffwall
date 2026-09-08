@@ -4,7 +4,7 @@
 
 import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
 import type { DiffLine as Line } from "../shared/types.js";
-import { DiffLine } from "./DiffLine.js";
+import { DiffLine, type LineInteract } from "./DiffLine.js";
 import { useVirtualList } from "./useVirtualList.js";
 
 export interface VirtualLinesHandle {
@@ -16,11 +16,15 @@ interface Props {
   rowHeight: number;
   /** Indices (into `lines`) of changed rows, for the minimap + navigation. */
   changedRows: number[];
+  interact?: LineInteract;
   maxHeight?: number;
 }
 
 export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
-  function VirtualLines({ lines, rowHeight, changedRows, maxHeight = 600 }, ref) {
+  function VirtualLines(
+    { lines, rowHeight, changedRows, interact, maxHeight = 600 },
+    ref,
+  ) {
     const { scrollRef, window, scrollToIndex } = useVirtualList(
       lines.length,
       rowHeight,
@@ -54,7 +58,7 @@ export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
         >
           <div style={{ height: window.padTop }} />
           {slice.map((line, i) => (
-            <DiffLine key={window.start + i} line={line} />
+            <DiffLine key={window.start + i} line={line} interact={interact} />
           ))}
           <div style={{ height: window.padBottom }} />
         </div>

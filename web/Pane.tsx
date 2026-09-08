@@ -5,9 +5,11 @@
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DiffLine as Line, FileDiff, ViewMode } from "../shared/types.js";
-import { DiffLine } from "./DiffLine.js";
+import { DiffLine, type LineInteract } from "./DiffLine.js";
 import { useFullFile } from "./useFullFile.js";
+import { useLineInteract } from "./useLineInteract.js";
 import { VirtualLines, type VirtualLinesHandle } from "./VirtualLines.js";
+import type { RefTray } from "./references.js";
 
 /** Handlers a focused pane registers so App's j/k keys can drive it. */
 export interface PaneNav {
@@ -33,6 +35,7 @@ interface Props {
   onToggleMode: (path: string) => void;
   focused: boolean;
   onFocus: (path: string) => void;
+  tray: RefTray;
   /** When focused, register j/k navigation handlers (null to clear). */
   onRegisterNav?: (path: string, nav: PaneNav | null) => void;
 }
@@ -44,9 +47,11 @@ function PaneImpl({
   onToggleMode,
   focused,
   onFocus,
+  tray,
   onRegisterNav,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  const interact = useLineInteract(file, tray);
 
   const canFull = !file.binary && !file.error && file.status !== "untracked";
   const effectiveMode: ViewMode = canFull ? mode : "diff";
@@ -97,10 +102,11 @@ function PaneImpl({
             base={base}
             focused={focused}
             path={file.path}
+            interact={interact}
             onRegisterNav={onRegisterNav}
           />
         ) : (
-          <DiffBody file={file} base={base} />
+          <DiffBody file={file} base={base} interact={interact} />
         ))}
     </div>
   );
@@ -108,7 +114,15 @@ function PaneImpl({
 
 // ---- Diff view with gap expansion --------------------------------------------
 
-function DiffBody({ file, base }: { file: FileDiff; base: string }) {
+function DiffBody({
+  file,
+  base,
+  interact,
+}: {
+  file: FileDiff;
+  base: string;
+  interact: LineInteract;
+}) {
   // Gaps the user has expanded, keyed by the hunk index they precede.
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const needFull = expanded.size > 0;
@@ -150,6 +164,7 @@ function DiffBody({ file, base }: { file: FileDiff; base: string }) {
                 lines={fullByNew}
                 fromNew={prevEndNew + 1}
                 toNew={thisStartNew - 1}
+                interact={interact}
               />
             )}
             {showGap && isOpen && !fullByNew && (
@@ -157,7 +172,7 @@ function DiffBody({ file, base }: { file: FileDiff; base: string }) {
             )}
             <div className="hunk-header">{h.header}</div>
             {h.lines.map((line, li) => (
-              <DiffLine key={li} line={line} />
+              <DiffLine key={li} line={line} interact={interact} />
             ))}
           </div>
         );
@@ -175,10 +190,12 @@ function GapLines({
   lines,
   fromNew,
   toNew,
+  interact,
 }: {
   lines: Map<number, Line>;
   fromNew: number;
   toNew: number;
+  interact: LineInteract;
 }) {
   const out: Line[] = [];
   for (let n = fromNew; n <= toNew; n++) {
@@ -188,7 +205,7 @@ function GapLines({
   return (
     <>
       {out.map((line, i) => (
-        <DiffLine key={i} line={line} />
+        <DiffLine key={i} line={line} interact={interact} />
       ))}
     </>
   );
@@ -217,12 +234,14 @@ function FullBody({
   base,
   focused,
   path,
+  interact,
   onRegisterNav,
 }: {
   file: FileDiff;
   base: string;
   focused: boolean;
   path: string;
+  interact: LineInteract;
   onRegisterNav?: (path: string, nav: PaneNav | null) => void;
 }) {
   const side = file.status === "deleted" ? "old" : "new";
@@ -287,6 +306,7 @@ function FullBody({
         lines={data.lines}
         rowHeight={ROW_HEIGHT}
         changedRows={changedRows}
+        interact={interact}
       />
       {data.truncated && (
         <div className="pane-note truncated">
