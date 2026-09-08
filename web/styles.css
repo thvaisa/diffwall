@@ -429,10 +429,142 @@ body {
 
 /* ---- Columns ---------------------------------------------------------- */
 
+.main {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .wall {
   flex: 1 1 auto;
   overflow: auto;
   padding: 8px;
+}
+
+/* ---- File tree sidebar ----------------------------------------------- */
+
+.file-tree {
+  flex: 0 0 auto;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-pane);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+  font-size: 12px;
+}
+.file-tree-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--bg-header);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
+}
+.file-tree-head button {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.file-tree-head button:hover {
+  color: var(--text);
+}
+.file-tree-body {
+  overflow: auto;
+  padding: 4px 0;
+}
+
+.tree-dir,
+.tree-file {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+.tree-file:hover,
+.tree-dir:hover {
+  background: rgba(88, 166, 255, 0.08);
+}
+.tree-file.focused {
+  background: rgba(88, 166, 255, 0.18);
+}
+.tree-caret {
+  color: var(--text-dim);
+  width: 10px;
+  flex: 0 0 auto;
+}
+.tree-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.tree-dir .tree-name {
+  color: var(--text);
+  font-weight: 500;
+}
+.tree-dir-count {
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex: 0 0 auto;
+}
+.tree-eye {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 0 2px;
+  flex: 0 0 auto;
+  opacity: 0.5;
+}
+.tree-dir:hover .tree-eye {
+  opacity: 1;
+}
+.hidden-dir {
+  opacity: 0.45;
+}
+.hidden-dir .tree-eye {
+  opacity: 1;
+}
+.tree-file .status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.tree-counts {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  flex: 0 0 auto;
+  display: flex;
+  gap: 3px;
+}
+.tree-counts .add {
+  color: var(--add-bar);
+}
+.tree-counts .del {
+  color: var(--del-bar);
+}
+
+.toolbar button.tree-btn {
+  padding: 3px 8px;
+  font-size: 13px;
+}
+.toolbar button.tree-btn.on {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .columns {

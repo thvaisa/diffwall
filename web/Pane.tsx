@@ -116,6 +116,7 @@ function PaneImpl({
   return (
     <div
       ref={paneRef}
+      data-pane-path={file.path}
       className={`pane${focused ? " focused" : ""}${flashClass}${
         collapsed ? " collapsed" : ""
       }`}

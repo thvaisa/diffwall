@@ -17,6 +17,8 @@ import { usePaneHeights } from "./usePaneHeights.js";
 import { readUrlSettings, useUrlSync } from "./useUrlState.js";
 import { BaseSelect } from "./BaseSelect.js";
 import { HelpOverlay } from "./HelpOverlay.js";
+import { FileTree } from "./FileTree.js";
+import { isHidden } from "./fileTree.js";
 
 export function App() {
   // URL query overrides localStorage on first load (bookmarkable / per-tab).
@@ -43,6 +45,12 @@ export function App() {
     return loadJson<ViewMode>("defaultMode", ViewMode.Diff);
   });
   const [helpOpen, setHelpOpen] = useState(false);
+  const [treeOpen, setTreeOpen] = useState(() =>
+    loadJson<boolean>("treeOpen", false),
+  );
+  const [hiddenDirs, setHiddenDirs] = useState<Set<string>>(
+    () => new Set(loadJson<string[]>("hiddenDirs", [])),
+  );
 
   const columnWidths = useColumnWidths(columnCount);
   const paneHeights = usePaneHeights();
@@ -60,6 +68,29 @@ export function App() {
   useEffect(() => saveJson("interval", intervalMs), [intervalMs]);
   useEffect(() => saveJson("sort", sortMode), [sortMode]);
   useEffect(() => saveJson("autoPoll", autoPoll), [autoPoll]);
+  useEffect(() => saveJson("treeOpen", treeOpen), [treeOpen]);
+  useEffect(
+    () => saveJson("hiddenDirs", [...hiddenDirs]),
+    [hiddenDirs],
+  );
+
+  const toggleHiddenDir = useCallback((dirPath: string) => {
+    setHiddenDirs((cur) => {
+      const next = new Set(cur);
+      if (next.has(dirPath)) next.delete(dirPath);
+      else next.add(dirPath);
+      return next;
+    });
+  }, []);
+
+  // Scroll to and focus a file's pane when picked from the tree.
+  const pickFile = useCallback((path: string) => {
+    setFocused(path);
+    const el = document.querySelector(
+      `[data-pane-path="${CSS.escape(path)}"]`,
+    );
+    el?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   // Mirror settings into the URL so a configured view is bookmarkable and each
   // tab can carry its own config independent of shared localStorage.
@@ -92,7 +123,8 @@ export function App() {
   // reorder when the file set or sort changes — never mid-read while frozen.
   const orderedFiles = useMemo<FileDiff[]>(() => {
     if (!data) return [];
-    const files = [...data.files];
+    // Drop files under any hidden folder (the tree's eye toggles).
+    const files = data.files.filter((f) => !isHidden(f.path, hiddenDirs));
     if (sortMode === SortMode.Recent && !frozen) {
       files.sort((a, b) => {
         const ra = recencyRef.current.get(a.path) ?? 0;
@@ -105,7 +137,7 @@ export function App() {
     }
     return files;
     // recencyRef is a ref; changed drives re-eval so recency updates take effect.
-  }, [data, sortMode, frozen, changed]);
+  }, [data, sortMode, frozen, changed, hiddenDirs]);
 
   const columns = useMemo(
     () => assignColumns(orderedFiles, columnCount),
@@ -202,6 +234,9 @@ export function App() {
           e.preventDefault();
           baseInputRef.current?.focus();
           break;
+        case "b":
+          setTreeOpen((v) => !v);
+          break;
         case "?":
           setHelpOpen((v) => !v);
           break;
@@ -219,6 +254,13 @@ export function App() {
   return (
     <div className="app">
       <div className="toolbar">
+        <button
+          className={`tree-btn${treeOpen ? " on" : ""}`}
+          onClick={() => setTreeOpen((v) => !v)}
+          title="toggle file tree (b)"
+        >
+          ☰
+        </button>
         <span className="brand">diffwall</span>
 
         <label>
@@ -328,7 +370,18 @@ export function App() {
         </div>
       )}
 
-      <div className="wall">
+      <div className="main">
+        {treeOpen && data && (
+          <FileTree
+            files={data.files}
+            hidden={hiddenDirs}
+            onToggleHidden={toggleHiddenDir}
+            onPickFile={pickFile}
+            focusedPath={focused}
+            onClose={() => setTreeOpen(false)}
+          />
+        )}
+        <div className="wall">
         {data && data.files.length === 0 ? (
           <div className="empty-state">
             No changes against <code>{data.base}</code>.
@@ -370,6 +423,7 @@ export function App() {
             ))}
           </div>
         )}
+        </div>
       </div>
 
       <RefTray tray={tray} />
