@@ -8,6 +8,7 @@
 // Memoized so unchanged lines don't re-render on a pane update.
 
 import { memo } from "react";
+import { LineKind } from "../shared/types.js";
 import type { DiffLine as Line } from "../shared/types.js";
 
 export interface LineInteract {
@@ -32,7 +33,8 @@ interface Props {
 }
 
 function DiffLineImpl({ line, interact }: Props) {
-  const marker = line.kind === "add" ? "+" : line.kind === "del" ? "−" : " ";
+  const marker =
+    line.kind === LineKind.Add ? "+" : line.kind === LineKind.Del ? "−" : " ";
   // Reference number: prefer new-side; deletions reference their old number.
   const refNo = line.new ?? line.old;
 

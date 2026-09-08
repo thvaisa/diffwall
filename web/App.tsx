@@ -5,15 +5,14 @@
 // the toolbar and persist.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FileDiff, ViewMode } from "../shared/types.js";
+import { SortMode, ViewMode } from "../shared/types.js";
+import type { FileDiff } from "../shared/types.js";
 import { assignColumns } from "./layout.js";
 import { Pane, type PaneNav } from "./Pane.js";
 import { loadJson, saveJson } from "./persist.js";
 import { useReferences } from "./references.js";
 import { RefTray } from "./RefTray.js";
 import { useDiffPoll } from "./useDiffPoll.js";
-
-type SortMode = "path" | "recent";
 
 export function App() {
   const [base, setBase] = useState("HEAD");
@@ -30,12 +29,12 @@ export function App() {
   );
   const [frozen, setFrozen] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>(() =>
-    loadJson<SortMode>("sort", "path"),
+    loadJson<SortMode>("sort", SortMode.Path),
   );
   const [defaultMode, setDefaultMode] = useState<ViewMode>(() => {
     const q = new URLSearchParams(location.search).get("view");
-    if (q === "full" || q === "diff") return q;
-    return loadJson<ViewMode>("defaultMode", "diff");
+    if (q === ViewMode.Full || q === ViewMode.Diff) return q;
+    return loadJson<ViewMode>("defaultMode", ViewMode.Diff);
   });
 
   const [modes, setModes] = useState<Record<string, ViewMode>>(() =>
@@ -73,7 +72,7 @@ export function App() {
   const orderedFiles = useMemo<FileDiff[]>(() => {
     if (!data) return [];
     const files = [...data.files];
-    if (sortMode === "recent" && !frozen) {
+    if (sortMode === SortMode.Recent && !frozen) {
       files.sort((a, b) => {
         const ra = recencyRef.current.get(a.path) ?? 0;
         const rb = recencyRef.current.get(b.path) ?? 0;
@@ -101,7 +100,10 @@ export function App() {
     (path: string) => {
       setModes((m) => {
         const cur = m[path] ?? defaultMode;
-        return { ...m, [path]: cur === "diff" ? "full" : "diff" };
+        return {
+          ...m,
+          [path]: cur === ViewMode.Diff ? ViewMode.Full : ViewMode.Diff,
+        };
       });
     },
     [defaultMode],
@@ -159,7 +161,9 @@ export function App() {
           if (focused) toggleMode(focused);
           break;
         case "E":
-          setAllModes(defaultMode === "diff" ? "full" : "diff");
+          setAllModes(
+            defaultMode === ViewMode.Diff ? ViewMode.Full : ViewMode.Diff,
+          );
           break;
         case "j":
           navRef.current?.nav.next();
@@ -250,16 +254,10 @@ export function App() {
 
         <label>
           every
-          <input
-            type="number"
-            min={250}
-            step={250}
+          <IntervalInput
             value={intervalMs}
             disabled={!autoPoll}
-            onChange={(e) =>
-              setIntervalMs(Math.max(250, Number(e.target.value) || 2000))
-            }
-            title="poll interval (ms)"
+            onCommit={setIntervalMs}
           />
           ms
         </label>
@@ -337,6 +335,52 @@ export function App() {
 
       <RefTray tray={tray} />
     </div>
+  );
+}
+
+// Poll-interval field. Holds free text while editing (so you can clear it and
+// type a new value without it fighting back) and commits a clamped number only
+// on blur or Enter. Re-syncs to the prop when not being edited.
+const MIN_INTERVAL = 250;
+function IntervalInput({
+  value,
+  disabled,
+  onCommit,
+}: {
+  value: number;
+  disabled: boolean;
+  onCommit: (ms: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  const [editing, setEditing] = useState(false);
+
+  // Reflect external changes only while the user isn't typing.
+  useEffect(() => {
+    if (!editing) setText(String(value));
+  }, [value, editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const n = Math.round(Number(text));
+    if (Number.isFinite(n) && n > 0) onCommit(Math.max(MIN_INTERVAL, n));
+    else setText(String(value)); // reject junk, restore last good value
+  };
+
+  return (
+    <input
+      type="number"
+      min={MIN_INTERVAL}
+      step={250}
+      value={text}
+      disabled={disabled}
+      onFocus={() => setEditing(true)}
+      onChange={(e) => setText(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+      }}
+      title="poll interval (ms); applies on Enter or blur"
+    />
   );
 }
 

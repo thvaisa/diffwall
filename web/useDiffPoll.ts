@@ -5,10 +5,11 @@
 // (but keeps counting pending changes so you know how far behind you are).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChangeKind } from "../shared/types.js";
 import type { DiffResponse } from "../shared/types.js";
 import { fetchDiff, type DiffParams } from "./api.js";
 
-export type ChangeKind = "new" | "changed";
+export type { ChangeKind };
 
 export interface PollState {
   data: DiffResponse | null;
@@ -67,8 +68,8 @@ export function useDiffPoll(
       const prev = prevHashes.current;
       for (const f of files) {
         const before = prev.get(f.path);
-        if (before === undefined) changes.set(f.path, "new");
-        else if (before !== f.hash) changes.set(f.path, "changed");
+        if (before === undefined) changes.set(f.path, ChangeKind.New);
+        else if (before !== f.hash) changes.set(f.path, ChangeKind.Changed);
       }
       return changes;
     },

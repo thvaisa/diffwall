@@ -6,12 +6,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { FileStatus, LineKind } from "../shared/types.js";
 import type {
   DiffLine,
   DiffResponse,
   FileDiff,
   FileResponse,
-  FileStatus,
   Hunk,
 } from "../shared/types.js";
 import {
@@ -47,16 +47,16 @@ function statusFromCode(code: string): FileStatus {
   const c = code[0];
   switch (c) {
     case "A":
-      return "added";
+      return FileStatus.Added;
     case "D":
-      return "deleted";
+      return FileStatus.Deleted;
     case "R":
-      return "renamed";
+      return FileStatus.Renamed;
     case "T":
-      return "typechange";
+      return FileStatus.Typechange;
     case "M":
     default:
-      return "modified";
+      return FileStatus.Modified;
   }
 }
 
@@ -68,7 +68,7 @@ function applyHighlight(
 ): void {
   for (const h of hunks) {
     for (const line of h.lines) {
-      if (line.kind === "del") {
+      if (line.kind === LineKind.Del) {
         const hi = line.old != null && oldLines ? oldLines[line.old - 1] : undefined;
         line.html = hi ?? escapeHtml(line.html);
       } else {
@@ -150,8 +150,8 @@ async function buildOneFile(
       let del = 0;
       for (const h of apiHunks) {
         for (const l of h.lines) {
-          if (l.kind === "add") add++;
-          else if (l.kind === "del") del++;
+          if (l.kind === LineKind.Add) add++;
+          else if (l.kind === LineKind.Del) del++;
         }
       }
       fd.added = add;
@@ -162,14 +162,18 @@ async function buildOneFile(
     let newLines: string[] | null = null;
     let oldLines: string[] | null = null;
 
-    if (entry.status !== "deleted") {
+    if (entry.status !== FileStatus.Deleted) {
       const newContent = await readNewContent(repoRoot, entry.path);
       if (newContent != null) {
         fd.newLineCount = newContent.length === 0 ? 0 : newContent.split("\n").length;
         newLines = await highlightFile(newContent, entry.path, theme);
       }
     }
-    if (entry.status !== "added" && entry.status !== "untracked" && !untracked) {
+    if (
+      entry.status !== FileStatus.Added &&
+      entry.status !== FileStatus.Untracked &&
+      !untracked
+    ) {
       const oldRef = base;
       const oldContent = await showOld(
         repoRoot,
@@ -245,7 +249,7 @@ export async function buildDiffResponse(opts: BuildOptions): Promise<DiffRespons
       entries.push({
         path: p,
         oldPath: null,
-        status: "untracked",
+        status: FileStatus.Untracked,
         added: 0,
         removed: 0,
         untracked: true,
@@ -314,7 +318,7 @@ export async function buildFileResponse(
     const cap = capLines(oldContent, MAX_FULL_FILE_LINES);
     const hi = await highlightFile(cap.content, path, theme);
     const lines: DiffLine[] = hi.map((html, i) => ({
-      kind: "ctx",
+      kind: LineKind.Ctx,
       old: i + 1,
       new: null,
       html,
@@ -349,7 +353,7 @@ export async function buildFileResponse(
   if (parsed.hunks.length === 0) {
     // No diff (identical, or diff failed): render the new file as pure context.
     for (let n = 1; n <= newTotal; n++) {
-      lines.push({ kind: "ctx", old: n, new: n, html: newHi[n - 1] ?? "" });
+      lines.push({ kind: LineKind.Ctx, old: n, new: n, html: newHi[n - 1] ?? "" });
     }
     return { path, lang, truncated: cap.truncated, lines };
   }
@@ -360,9 +364,9 @@ export async function buildFileResponse(
   let coveredNew = 0;
   for (const h of parsed.hunks) {
     for (const l of h.lines) {
-      if (l.kind === "del") {
+      if (l.kind === LineKind.Del) {
         lines.push({
-          kind: "del",
+          kind: LineKind.Del,
           old: l.old,
           new: null,
           html: (l.old != null && oldHi ? oldHi[l.old - 1] : undefined) ?? escapeHtml(l.text),
@@ -383,7 +387,7 @@ export async function buildFileResponse(
   // If the file was capped below the diff's reach, any remaining new lines are
   // unchanged tail context; append them so the view still covers the whole file.
   for (let n = coveredNew + 1; n <= newTotal; n++) {
-    lines.push({ kind: "ctx", old: null, new: n, html: newHi[n - 1] ?? "" });
+    lines.push({ kind: LineKind.Ctx, old: null, new: n, html: newHi[n - 1] ?? "" });
   }
 
   return { path, lang, truncated: cap.truncated, lines };

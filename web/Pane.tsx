@@ -4,7 +4,8 @@
 // Mode is owned by App (persisted per path) and passed in with a toggle.
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DiffLine as Line, FileDiff, ViewMode } from "../shared/types.js";
+import { ChangeKind, FileStatus, LineKind, ViewMode } from "../shared/types.js";
+import type { DiffLine as Line, FileDiff } from "../shared/types.js";
 import { DiffLine, type LineInteract } from "./DiffLine.js";
 import { useFullFile } from "./useFullFile.js";
 import { useLineInteract } from "./useLineInteract.js";
@@ -37,7 +38,7 @@ interface Props {
   onFocus: (path: string) => void;
   tray: RefTray;
   /** "new" or "changed" from the latest poll; triggers a border flash. */
-  flash?: "new" | "changed" | null;
+  flash?: ChangeKind | null;
   /** When focused, register j/k navigation handlers (null to clear). */
   onRegisterNav?: (path: string, nav: PaneNav | null) => void;
 }
@@ -56,13 +57,14 @@ function PaneImpl({
   const [collapsed, setCollapsed] = useState(false);
   const interact = useLineInteract(file, tray);
 
-  const canFull = !file.binary && !file.error && file.status !== "untracked";
-  const effectiveMode: ViewMode = canFull ? mode : "diff";
+  const canFull =
+    !file.binary && !file.error && file.status !== FileStatus.Untracked;
+  const effectiveMode: ViewMode = canFull ? mode : ViewMode.Diff;
 
   // Flash the border briefly when this pane's content changed on a poll. Keyed
   // on file.hash so a genuine change re-triggers even for the same flash kind.
   const [flashing, setFlashing] = useState(false);
-  const flashKind = useRef<"new" | "changed" | null>(null);
+  const flashKind = useRef<ChangeKind | null>(null);
   useEffect(() => {
     if (!flash) return;
     flashKind.current = flash;
@@ -110,13 +112,13 @@ function PaneImpl({
             onClick={() => onToggleMode(file.path)}
             title="toggle diff / full-file view (e)"
           >
-            {effectiveMode === "diff" ? "diff" : "full"}
+            {effectiveMode === ViewMode.Diff ? "diff" : "full"}
           </button>
         )}
       </div>
 
       {!collapsed &&
-        (effectiveMode === "full" ? (
+        (effectiveMode === ViewMode.Full ? (
           <FullBody
             file={file}
             base={base}
@@ -146,7 +148,7 @@ function DiffBody({
   // Gaps the user has expanded, keyed by the hunk index they precede.
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const needFull = expanded.size > 0;
-  const side = file.status === "deleted" ? "old" : "new";
+  const side = file.status === FileStatus.Deleted ? "old" : "new";
   const full = useFullFile(file.path, base, file.hash, side, needFull);
 
   if (file.error) return <div className="pane-note error">error: {file.error}</div>;
@@ -264,7 +266,7 @@ function FullBody({
   interact: LineInteract;
   onRegisterNav?: (path: string, nav: PaneNav | null) => void;
 }) {
-  const side = file.status === "deleted" ? "old" : "new";
+  const side = file.status === FileStatus.Deleted ? "old" : "new";
   const { data, loading, error } = useFullFile(file.path, base, file.hash, side, true);
   const vlRef = useRef<VirtualLinesHandle | null>(null);
   const cursor = useRef(-1);
@@ -275,7 +277,7 @@ function FullBody({
     const out: number[] = [];
     let prev = -2;
     data.lines.forEach((l, i) => {
-      if (l.kind !== "ctx") {
+      if (l.kind !== LineKind.Ctx) {
         if (i !== prev + 1) out.push(i); // start of a new region
         prev = i;
       }
@@ -287,7 +289,7 @@ function FullBody({
     if (!data) return [];
     const rows: number[] = [];
     data.lines.forEach((l, i) => {
-      if (l.kind !== "ctx") rows.push(i);
+      if (l.kind !== LineKind.Ctx) rows.push(i);
     });
     return rows;
   }, [data]);

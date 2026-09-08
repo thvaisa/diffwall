@@ -3,6 +3,7 @@
 // a long file. Body scrolls independently; only the visible slice is in the DOM.
 
 import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
+import { LineKind } from "../shared/types.js";
 import type { DiffLine as Line } from "../shared/types.js";
 import { DiffLine, type LineInteract } from "./DiffLine.js";
 import { useVirtualList } from "./useVirtualList.js";
@@ -41,7 +42,7 @@ export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
       () =>
         changedRows.map((r) => ({
           top: `${(r / Math.max(1, lines.length)) * 100}%`,
-          kind: lines[r]?.kind ?? "ctx",
+          kind: lines[r]?.kind ?? LineKind.Ctx,
         })),
       [changedRows, lines],
     );

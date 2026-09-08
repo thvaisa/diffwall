@@ -1,17 +1,48 @@
 // Shared API contract between server and web. Keep in sync with the spec's
-// /api/diff and /api/file payloads. No runtime code here — types only.
+// /api/diff and /api/file payloads.
+//
+// Enum-like unions use the `const object + derived type` pattern rather than a
+// TS `enum`: it gives one source of truth and member autocomplete (LineKind.Add
+// instead of a bare "add" literal), is erased at compile time (no runtime cost,
+// safe under isolatedModules / Node type-stripping), and the string values ARE
+// the wire format — the JSON on the API is unchanged.
 
-export type LineKind = "ctx" | "add" | "del";
+export const LineKind = {
+  Ctx: "ctx",
+  Add: "add",
+  Del: "del",
+} as const;
+export type LineKind = (typeof LineKind)[keyof typeof LineKind];
 
-export type ViewMode = "diff" | "full";
+export const ViewMode = {
+  Diff: "diff",
+  Full: "full",
+} as const;
+export type ViewMode = (typeof ViewMode)[keyof typeof ViewMode];
 
-export type FileStatus =
-  | "modified"
-  | "added"
-  | "deleted"
-  | "renamed"
-  | "untracked"
-  | "typechange";
+export const FileStatus = {
+  Modified: "modified",
+  Added: "added",
+  Deleted: "deleted",
+  Renamed: "renamed",
+  Untracked: "untracked",
+  Typechange: "typechange",
+} as const;
+export type FileStatus = (typeof FileStatus)[keyof typeof FileStatus];
+
+/** How a file changed between two polls (drives per-pane flashing). */
+export const ChangeKind = {
+  New: "new",
+  Changed: "changed",
+} as const;
+export type ChangeKind = (typeof ChangeKind)[keyof typeof ChangeKind];
+
+/** Pane ordering in the wall. */
+export const SortMode = {
+  Path: "path",
+  Recent: "recent",
+} as const;
+export type SortMode = (typeof SortMode)[keyof typeof SortMode];
 
 /** One rendered line. `html` is Shiki-highlighted (or escaped plaintext). */
 export interface DiffLine {

@@ -3,7 +3,8 @@
 // highlight — `html` is filled in later by highlight.ts, which needs whole-file
 // context. Here `html` carries the raw (unescaped) line text as a placeholder.
 
-import type { Hunk, LineKind } from "../shared/types.js";
+import { LineKind } from "../shared/types.js";
+import type { Hunk } from "../shared/types.js";
 
 export interface RawLine {
   kind: LineKind;
@@ -93,15 +94,15 @@ export function parseUnifiedDiff(text: string, maxLines: number): ParsedDiff {
     const body = line.slice(1);
 
     if (marker === "+") {
-      current.lines.push({ kind: "add", old: null, new: newNo, text: body });
+      current.lines.push({ kind: LineKind.Add, old: null, new: newNo, text: body });
       newNo++;
       emitted++;
     } else if (marker === "-") {
-      current.lines.push({ kind: "del", old: oldNo, new: null, text: body });
+      current.lines.push({ kind: LineKind.Del, old: oldNo, new: null, text: body });
       oldNo++;
       emitted++;
     } else if (marker === " ") {
-      current.lines.push({ kind: "ctx", old: oldNo, new: newNo, text: body });
+      current.lines.push({ kind: LineKind.Ctx, old: oldNo, new: newNo, text: body });
       oldNo++;
       newNo++;
       emitted++;
