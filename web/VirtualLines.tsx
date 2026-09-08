@@ -2,11 +2,12 @@
 // virtualization, plus a change minimap strip so you can find changed regions in
 // a long file. Body scrolls independently; only the visible slice is in the DOM.
 
-import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, useImperativeHandle, useMemo } from "react";
 import { LineKind } from "../shared/types.js";
 import type { DiffLine as Line } from "../shared/types.js";
 import { DiffLine, type LineInteract } from "./DiffLine.js";
 import { useVirtualList } from "./useVirtualList.js";
+import { useAutoScroll } from "./useAutoScroll.js";
 
 export interface VirtualLinesHandle {
   scrollToIndex: (index: number) => void;
@@ -30,7 +31,7 @@ export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
       lines.length,
       rowHeight,
     );
-    const bodyRef = useRef<HTMLDivElement | null>(null);
+    const autoScrollRef = useAutoScroll<HTMLDivElement>();
 
     useImperativeHandle(ref, () => ({ scrollToIndex }), [scrollToIndex]);
 
@@ -53,7 +54,7 @@ export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
           className="pane-body full"
           ref={(el) => {
             scrollRef.current = el;
-            bodyRef.current = el;
+            autoScrollRef.current = el;
           }}
           style={{ maxHeight }}
         >

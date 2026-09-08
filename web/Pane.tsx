@@ -369,6 +369,24 @@ function FullBody({
     return () => onRegisterNav(path, null);
   }, [focused, onRegisterNav, path, jump]);
 
+  // On first load of the full view, land on the first changed region instead of
+  // the top of the file — so switching diff→full doesn't make you scroll back
+  // down to where the change is. Runs once per fetched file (keyed by hash).
+  const landedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data || regions.length === 0) return;
+    if (landedFor.current === file.hash) return;
+    landedFor.current = file.hash;
+    cursor.current = 0;
+    const target = regions[0] ?? 0;
+    // Defer to let VirtualLines mount and measure its viewport first.
+    const id = window.setTimeout(
+      () => vlRef.current?.scrollToIndex(Math.max(0, target - 3)),
+      0,
+    );
+    return () => window.clearTimeout(id);
+  }, [data, regions, file.hash]);
+
   if (error) return <div className="pane-note error">error: {error}</div>;
   if (loading && !data) return <div className="pane-note">loading file…</div>;
   if (!data) return <div className="pane-note">no content</div>;

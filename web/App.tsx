@@ -383,10 +383,12 @@ function FragmentColumn({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Poll-interval field. Holds free text while editing (so you can clear it and
-// type a new value without it fighting back) and commits a clamped number only
-// on blur or Enter. Re-syncs to the prop when not being edited.
+// Poll-interval field. A plain text box (no native number spinner — its arrows
+// fired onChange but never committed) flanked by explicit − / + steppers that
+// apply immediately. Typing holds free text so you can clear and retype without
+// it fighting back; it commits on Enter or blur. Arrow keys also step.
 const MIN_INTERVAL = 250;
+const STEP = 250;
 function IntervalInput({
   value,
   disabled,
@@ -404,28 +406,61 @@ function IntervalInput({
     if (!editing) setText(String(value));
   }, [value, editing]);
 
+  const clamp = (n: number) => Math.max(MIN_INTERVAL, Math.round(n));
+
   const commit = () => {
     setEditing(false);
     const n = Math.round(Number(text));
-    if (Number.isFinite(n) && n > 0) onCommit(Math.max(MIN_INTERVAL, n));
+    if (Number.isFinite(n) && n > 0) onCommit(clamp(n));
     else setText(String(value)); // reject junk, restore last good value
   };
 
+  const step = (delta: number) => {
+    // Step from the current committed value and apply immediately.
+    const next = clamp(value + delta);
+    onCommit(next);
+    setText(String(next));
+  };
+
   return (
-    <input
-      type="number"
-      min={MIN_INTERVAL}
-      step={250}
-      value={text}
-      disabled={disabled}
-      onFocus={() => setEditing(true)}
-      onChange={(e) => setText(e.target.value)}
-      onBlur={commit}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
-      }}
-      title="poll interval (ms); applies on Enter or blur"
-    />
+    <span className="interval-input">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => step(-STEP)}
+        title="decrease interval"
+      >
+        −
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={text}
+        disabled={disabled}
+        onFocus={() => setEditing(true)}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+          else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            step(STEP);
+          } else if (e.key === "ArrowDown") {
+            e.preventDefault();
+            step(-STEP);
+          }
+        }}
+        title="poll interval (ms); applies on Enter or blur"
+      />
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => step(STEP)}
+        title="increase interval"
+      >
+        +
+      </button>
+    </span>
   );
 }
 

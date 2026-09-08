@@ -97,6 +97,29 @@ body {
   font-weight: 600;
 }
 
+/* Middle-click autoscroll origin marker. */
+.autoscroll-marker {
+  position: fixed;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: rgba(88, 166, 255, 0.12);
+  pointer-events: none;
+  z-index: 200;
+}
+.autoscroll-marker::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%);
+}
+
 /* ---- Help overlay ---------------------------------------------------- */
 
 .help-overlay {
@@ -201,6 +224,46 @@ body {
 
 .toolbar input[type="number"] {
   width: 46px;
+}
+
+.interval-input {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+}
+.interval-input input {
+  width: 52px;
+  text-align: center;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+  font-family: var(--font-mono);
+}
+.interval-input button {
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  padding: 0 7px;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+.interval-input button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.interval-input button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.interval-input button:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.interval-input button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.interval-input input:disabled {
+  opacity: 0.5;
 }
 
 .toolbar button {
