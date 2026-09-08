@@ -90,7 +90,10 @@ function PaneImpl({
   );
 
   const canFull =
-    !file.binary && !file.error && file.status !== FileStatus.Untracked;
+    !file.binary &&
+    !file.error &&
+    !file.special &&
+    file.status !== FileStatus.Untracked;
   const effectiveMode: ViewMode = canFull ? mode : ViewMode.Diff;
 
   // Flash the border briefly when this pane's content changed on a poll. Keyed
@@ -141,6 +144,7 @@ function PaneImpl({
           {file.added > 0 && file.removed > 0 && " "}
           {file.removed > 0 && <span className="del">−{file.removed}</span>}
         </span>
+        {file.special && <span className="tag special">{file.special}</span>}
         <span className="tag">{STATUS_TAG[file.status] ?? "?"}</span>
         {canFull && (
           <button

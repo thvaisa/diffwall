@@ -5,7 +5,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { readFile, stat } from "node:fs/promises";
 import { execFile } from "node:child_process";
-import { extname, join, resolve, sep } from "node:path";
+import { extname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type {
   DiffResponse,
@@ -121,11 +121,18 @@ function readBody(req: IncomingMessage, limit = 1_000_000): Promise<string> {
   });
 }
 
-/** True if `abs` is the repo root or lives inside it. Blocks path traversal. */
-function insideRepo(root: string, abs: string): boolean {
+/**
+ * Resolve a client-supplied repo-relative path to an absolute path inside the
+ * repo, or return null if it is absolute or escapes the root. Rejecting absolute
+ * inputs up front means `join` can't silently reinterpret "/etc/passwd" as a
+ * repo-relative lookup.
+ */
+function resolveInRepo(root: string, rel: string): string | null {
+  if (isAbsolute(rel)) return null;
   const r = resolve(root);
-  const a = resolve(abs);
-  return a === r || a.startsWith(r + sep);
+  const abs = resolve(join(r, rel));
+  if (abs === r || abs.startsWith(r + sep)) return abs;
+  return null;
 }
 
 const MIME: Record<string, string> = {
@@ -251,8 +258,8 @@ async function handle(
       sendJson(res, 400, { error: "missing path" });
       return;
     }
-    const abs = resolve(join(root, rel));
-    if (!insideRepo(root, abs)) {
+    const abs = resolveInRepo(root, rel);
+    if (!abs) {
       sendJson(res, 400, { error: "path escapes repository" });
       return;
     }
@@ -286,8 +293,8 @@ async function handle(
     }
     const rel = typeof parsed.path === "string" ? parsed.path : "";
     const line = typeof parsed.line === "number" ? parsed.line : 1;
-    const abs = resolve(join(root, rel));
-    if (!rel || !insideRepo(root, abs)) {
+    const abs = rel ? resolveInRepo(root, rel) : null;
+    if (!abs) {
       sendJson(res, 200, {
         ok: false,
         error: "path escapes repository",

@@ -70,6 +70,9 @@ export interface FileDiff {
   added: number;
   removed: number;
   binary: boolean;
+  /** "symlink" or "submodule" — shown via git's one-line diff, not read as
+   *  text; null for ordinary files. */
+  special?: "symlink" | "submodule" | null;
   /** Diff view was capped (per-file line cap). */
   truncated: boolean;
   /** sha1 of the raw diff text; used by the client to detect changes. */

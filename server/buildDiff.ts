@@ -158,6 +158,17 @@ async function buildOneFile(
       fd.removed = del;
     }
 
+    // Symlinks and submodules: show git's one-line diff verbatim, never follow
+    // the link or read the gitlink as text. Escape the raw hunk text as-is.
+    if (parsed.special) {
+      fd.special = parsed.special;
+      for (const h of apiHunks) {
+        for (const l of h.lines) l.html = escapeHtml(l.html);
+      }
+      fd.hunks = apiHunks;
+      return fd;
+    }
+
     // Highlight whole files for correct grammar context.
     let newLines: string[] | null = null;
     let oldLines: string[] | null = null;

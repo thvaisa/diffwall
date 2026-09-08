@@ -26,6 +26,9 @@ export interface ParsedDiff {
   binary: boolean;
   /** True if we stopped early at the per-file line cap. */
   truncated: boolean;
+  /** "symlink" or "submodule" when git's metadata marks it so; else null.
+   *  Such files are shown via git's one-line diff and never read as text. */
+  special: "symlink" | "submodule" | null;
 }
 
 const HUNK_RE = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/;
@@ -38,6 +41,7 @@ export function parseUnifiedDiff(text: string, maxLines: number): ParsedDiff {
   const hunks: RawHunk[] = [];
   let binary = false;
   let truncated = false;
+  let special: "symlink" | "submodule" | null = null;
   let emitted = 0;
 
   // Split without a trailing empty element eating a real final line.
@@ -49,6 +53,12 @@ export function parseUnifiedDiff(text: string, maxLines: number): ParsedDiff {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!;
+
+    // Symlink (mode 120000) and submodule/gitlink (mode 160000) markers appear
+    // in the file header before any hunk. Flag them; caller won't highlight.
+    if (/\bmode 120000\b/.test(line)) special = "symlink";
+    else if (/\bmode 160000\b/.test(line) || line.startsWith("Subproject commit"))
+      special = "submodule";
 
     // Detect binary markers git emits instead of hunks.
     if (
@@ -115,7 +125,7 @@ export function parseUnifiedDiff(text: string, maxLines: number): ParsedDiff {
     // Any other leading char (shouldn't happen with --no-color) is ignored.
   }
 
-  return { hunks, binary, truncated };
+  return { hunks, binary, truncated, special };
 }
 
 /** Convert parsed hunks into the API shape, with `html` still as raw text. */

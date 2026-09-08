@@ -396,6 +396,11 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
+.pane-header .tag.special {
+  background: #2d2140;
+  color: #a371f7;
+  text-transform: none;
+}
 
 .pane.focused {
   border-color: var(--accent);
