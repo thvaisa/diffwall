@@ -132,7 +132,8 @@ body {
 }
 .md-scroll {
   overflow: auto;
-  max-height: 600px;
+  flex: 1 1 auto;
+  min-height: 0;
   min-width: 0;
 }
 .md-source-toggle {
