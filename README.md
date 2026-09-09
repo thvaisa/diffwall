@@ -1,5 +1,7 @@
 # diffwall
 
+![preview](preview.png)
+
 A local, browser-based, read-only diff wall. Shows every changed file in a git
 repo as a pane, tiled across a large screen, refreshing itself while coding
 agents work. Local Linux only — repo, agents, server, and browser on one box.
