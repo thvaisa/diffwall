@@ -19,6 +19,8 @@ const MOUSE: [string, string][] = [
   ["shift-click", "copy a range path:a-b"],
   ["drag across gutter", "select a line range"],
   ["alt-click / ⧉ icon", "open the line in VS Code"],
+  ["select text → ✎ note", "attach a note to that spot (for an agent)"],
+  ["middle-click drag", "autoscroll a pane body"],
   ["drag column splitter", "resize columns"],
   ["drag pane bottom edge", "resize pane height (double-click: auto)"],
 ];

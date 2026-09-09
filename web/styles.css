@@ -243,6 +243,159 @@ body {
   border-radius: 4px;
 }
 
+/* ---- Notepad --------------------------------------------------------- */
+
+.add-note-fab {
+  position: fixed;
+  transform: translateX(-50%);
+  z-index: 90;
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.note-editor-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+}
+.note-editor {
+  background: var(--bg-pane);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 14px 16px;
+  width: 460px;
+  max-width: 90%;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.note-editor-loc {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: 12px;
+}
+.note-editor-snip {
+  font-family: var(--font-mono);
+  color: var(--text-dim);
+  font-size: 11px;
+  margin: 4px 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.note-editor textarea {
+  width: 100%;
+  min-height: 70px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 8px;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.note-editor-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+.note-editor-actions .hint {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.note-editor-actions button {
+  background: var(--accent);
+  color: var(--bg);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.note-tray {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-header);
+  border-top: 1px solid var(--border);
+  max-height: 140px;
+  overflow-y: auto;
+}
+.note-tray-label {
+  color: var(--text-dim);
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+}
+.note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.note-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.note-loc {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--accent);
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+.note-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+.note-x {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 14px;
+  flex: 0 0 auto;
+}
+.note-x:hover {
+  color: var(--del-bar);
+}
+.note-tray button:not(.note-x) {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 9px;
+  font-size: 12px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+.note-tray button:not(.note-x):hover {
+  border-color: var(--border-strong);
+}
+
 /* ---- Help overlay ---------------------------------------------------- */
 
 .help-overlay {

@@ -11,6 +11,8 @@ import { Pane, type PaneNav } from "./Pane.js";
 import { loadJson, saveJson } from "./persist.js";
 import { useReferences } from "./references.js";
 import { RefTray } from "./RefTray.js";
+import { useNotes } from "./notes.js";
+import { NotePad } from "./NotePad.js";
 import { useDiffPoll } from "./useDiffPoll.js";
 import { useColumnWidths } from "./useColumnWidths.js";
 import { usePaneHeights } from "./usePaneHeights.js";
@@ -61,6 +63,7 @@ export function App() {
   const [focused, setFocused] = useState<string | null>(null);
 
   const tray = useReferences();
+  const notes = useNotes();
 
   useEffect(() => saveJson("columns", columnCount), [columnCount]);
   useEffect(() => saveJson("defaultMode", defaultMode), [defaultMode]);
@@ -434,6 +437,7 @@ export function App() {
       </div>
 
       <RefTray tray={tray} />
+      <NotePad pad={notes} />
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
     </div>
   );
