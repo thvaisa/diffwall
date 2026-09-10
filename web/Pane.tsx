@@ -186,6 +186,7 @@ function PaneImpl({
               path={file.path}
               interact={interact}
               onRegisterNav={onRegisterNav}
+              zoomed={zoomed}
             />
           ) : (
             <DiffBody file={file} base={base} interact={interact} />
@@ -329,6 +330,7 @@ function FullBody({
   path,
   interact,
   onRegisterNav,
+  zoomed,
 }: {
   file: FileDiff;
   base: string;
@@ -336,6 +338,7 @@ function FullBody({
   path: string;
   interact: LineInteract;
   onRegisterNav?: (path: string, nav: PaneNav | null) => void;
+  zoomed?: boolean;
 }) {
   const side = file.status === FileStatus.Deleted ? "old" : "new";
   const { data, loading, error } = useFullFile(file.path, base, file.hash, side, true);
@@ -446,6 +449,7 @@ function FullBody({
         rowHeight={ROW_HEIGHT}
         changedRows={changedRows}
         interact={interact}
+        maxHeight={zoomed ? undefined : 600}
       />
       {data.truncated && (
         <div className="pane-note truncated">

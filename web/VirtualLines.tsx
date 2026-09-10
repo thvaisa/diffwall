@@ -19,12 +19,13 @@ interface Props {
   /** Indices (into `lines`) of changed rows, for the minimap + navigation. */
   changedRows: number[];
   interact?: LineInteract;
+  /** Cap the scroll box height in px. Omit to fill the parent flex box. */
   maxHeight?: number;
 }
 
 export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
   function VirtualLines(
-    { lines, rowHeight, changedRows, interact, maxHeight = 600 },
+    { lines, rowHeight, changedRows, interact, maxHeight },
     ref,
   ) {
     const { scrollRef, window, scrollToIndex } = useVirtualList(
@@ -36,7 +37,6 @@ export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
     useImperativeHandle(ref, () => ({ scrollToIndex }), [scrollToIndex]);
 
     const slice = lines.slice(window.start, window.end);
-    const totalHeight = lines.length * rowHeight;
 
     // Minimap ticks: fractional position of each changed row.
     const ticks = useMemo(
@@ -56,7 +56,7 @@ export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
             scrollRef.current = el;
             autoScrollRef.current = el;
           }}
-          style={{ maxHeight }}
+          style={maxHeight ? { maxHeight } : undefined}
         >
           <div style={{ height: window.padTop }} />
           {slice.map((line, i) => (
@@ -65,7 +65,11 @@ export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
           <div style={{ height: window.padBottom }} />
         </div>
         {ticks.length > 0 && (
-          <div className="minimap" aria-hidden style={{ height: Math.min(totalHeight, maxHeight) }}>
+          <div
+            className="minimap"
+            aria-hidden
+            style={maxHeight ? { height: Math.min(lines.length * rowHeight, maxHeight) } : undefined}
+          >
             {ticks.map((t, i) => (
               <div
                 key={i}
