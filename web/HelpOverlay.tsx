@@ -7,6 +7,7 @@ const KEYS: [string, string][] = [
   ["r", "refresh now"],
   ["e", "toggle diff / full view on the focused pane"],
   ["E", "toggle view mode on all panes"],
+  ["z", "pop the focused pane out full-screen (Esc to close)"],
   ["j / k", "jump to next / previous changed region (full view)"],
   ["J / K", "focus next / previous pane"],
   ["1 – 6", "set column count"],
@@ -23,6 +24,7 @@ const MOUSE: [string, string][] = [
   ["middle-click drag", "autoscroll a pane body"],
   ["drag column splitter", "resize columns"],
   ["drag pane bottom edge", "resize pane height (double-click: auto)"],
+  ["⤢ icon / click backdrop", "pop a pane full-screen / close it"],
 ];
 
 export function HelpOverlay({ onClose }: { onClose: () => void }) {

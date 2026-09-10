@@ -61,6 +61,7 @@ export function App() {
     loadJson<Record<string, ViewMode>>("modes", {}),
   );
   const [focused, setFocused] = useState<string | null>(null);
+  const [zoomed, setZoomed] = useState<string | null>(null);
 
   const tray = useReferences();
   const notes = useNotes();
@@ -84,6 +85,10 @@ export function App() {
       else next.add(dirPath);
       return next;
     });
+  }, []);
+
+  const toggleZoom = useCallback((path: string) => {
+    setZoomed((cur) => (cur === path ? null : path));
   }, []);
 
   // Scroll to and focus a file's pane when picked from the tree.
@@ -113,6 +118,13 @@ export function App() {
 
   const [poll, controls] = useDiffPoll(params, intervalMs, frozen, autoPoll);
   const { data, connected, lastUpdated, changed, pending } = poll;
+
+  // If the zoomed file vanishes from the diff (reverted, staged away), drop
+  // the zoom instead of showing a stale/empty overlay.
+  useEffect(() => {
+    if (!zoomed || !data) return;
+    if (!data.files.some((f) => f.path === zoomed)) setZoomed(null);
+  }, [zoomed, data]);
 
   // Track most-recent-change time per path for the `recent` sort.
   const recencyRef = useRef<Map<string, number>>(new Map());
@@ -223,6 +235,9 @@ export function App() {
         case "e":
           if (focused) toggleMode(focused);
           break;
+        case "z":
+          if (focused) toggleZoom(focused);
+          break;
         case "E":
           setAllModes(
             defaultMode === ViewMode.Diff ? ViewMode.Full : ViewMode.Diff,
@@ -251,7 +266,8 @@ export function App() {
           setHelpOpen((v) => !v);
           break;
         case "Escape":
-          setHelpOpen(false);
+          if (zoomed) setZoomed(null);
+          else setHelpOpen(false);
           break;
         default:
           if (e.key >= "1" && e.key <= "6") setColumnCount(Number(e.key));
@@ -259,7 +275,17 @@ export function App() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [controls, focused, toggleMode, setAllModes, defaultMode, moveFocus, autoPoll]);
+  }, [
+    controls,
+    focused,
+    toggleMode,
+    setAllModes,
+    defaultMode,
+    moveFocus,
+    autoPoll,
+    zoomed,
+    toggleZoom,
+  ]);
 
   return (
     <div className="app">
@@ -419,6 +445,8 @@ export function App() {
                       onSetHeight={paneHeights.set}
                       onClearHeight={paneHeights.clear}
                       onRegisterNav={registerNav}
+                      zoomed={zoomed === file.path}
+                      onToggleZoom={toggleZoom}
                     />
                   ))}
                 </div>
@@ -439,6 +467,29 @@ export function App() {
       <RefTray tray={tray} />
       <NotePad pad={notes} />
       {helpOpen && <HelpOverlay onClose={() => setHelpOpen(false)} />}
+      {zoomed && data && (() => {
+        const file = data.files.find((f) => f.path === zoomed);
+        if (!file) return null;
+        return (
+          <div className="zoom-overlay" onMouseDown={() => setZoomed(null)}>
+            <div className="zoom-frame" onMouseDown={(e) => e.stopPropagation()}>
+              <Pane
+                file={file}
+                base={data.base}
+                mode={modeFor(file.path)}
+                onToggleMode={toggleMode}
+                focused={true}
+                onFocus={setFocused}
+                tray={tray}
+                flash={changed.get(file.path) ?? null}
+                onRegisterNav={registerNav}
+                zoomed={true}
+                onToggleZoom={toggleZoom}
+              />
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

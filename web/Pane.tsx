@@ -46,6 +46,10 @@ interface Props {
   onClearHeight?: (path: string) => void;
   /** When focused, register j/k navigation handlers (null to clear). */
   onRegisterNav?: (path: string, nav: PaneNav | null) => void;
+  /** Whether this pane is the one currently popped out full-screen. */
+  zoomed?: boolean;
+  /** Toggle full-screen focus for this pane (undefined hides the button). */
+  onToggleZoom?: (path: string) => void;
 }
 
 function PaneImpl({
@@ -61,6 +65,8 @@ function PaneImpl({
   onSetHeight,
   onClearHeight,
   onRegisterNav,
+  zoomed,
+  onToggleZoom,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
   const interact = useLineInteract(file, tray);
@@ -119,8 +125,8 @@ function PaneImpl({
       data-pane-path={file.path}
       className={`pane${focused ? " focused" : ""}${flashClass}${
         collapsed ? " collapsed" : ""
-      }`}
-      style={height && !collapsed ? { height } : undefined}
+      }${zoomed ? " zoomed" : ""}`}
+      style={height && !collapsed && !zoomed ? { height } : undefined}
       onMouseDown={() => onFocus(file.path)}
     >
       <div className="pane-header">
@@ -147,6 +153,18 @@ function PaneImpl({
         </span>
         {file.special && <span className="tag special">{file.special}</span>}
         <span className="tag">{STATUS_TAG[file.status] ?? "?"}</span>
+        {onToggleZoom && (
+          <button
+            className={`zoom-toggle${zoomed ? " on" : ""}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleZoom(file.path);
+            }}
+            title={zoomed ? "exit focus view (z / Esc)" : "focus this file (z)"}
+          >
+            {zoomed ? "⤡" : "⤢"}
+          </button>
+        )}
         {canFull && (
           <button
             className="mode-toggle"

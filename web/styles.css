@@ -941,6 +941,48 @@ body {
   color: var(--text);
 }
 
+.pane-header .zoom-toggle {
+  flex: 0 0 auto;
+  background: var(--bg);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 0 6px;
+  font-size: 12px;
+  cursor: pointer;
+  line-height: 1.6;
+}
+.pane-header .zoom-toggle:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.pane-header .zoom-toggle.on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ---- Zoomed (focus) pane ---------------------------------------------- */
+
+.zoom-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  z-index: 150;
+}
+.zoom-frame {
+  width: 100%;
+  height: 100%;
+  display: flex;
+}
+.zoom-frame .pane {
+  width: 100%;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+}
+
 .pane-body {
   overflow: auto;
   font-family: var(--font-mono);
