@@ -14,6 +14,7 @@ import { RefTray } from "./RefTray.js";
 import { useNotes } from "./notes.js";
 import { NotePad } from "./NotePad.js";
 import { useDiffPoll } from "./useDiffPoll.js";
+import { useResponsiveColumns } from "./useResponsiveColumns.js";
 import { useColumnWidths } from "./useColumnWidths.js";
 import { usePaneHeights } from "./usePaneHeights.js";
 import { readUrlSettings, useUrlSync } from "./useUrlState.js";
@@ -54,7 +55,8 @@ export function App() {
     () => new Set(loadJson<string[]>("hiddenDirs", [])),
   );
 
-  const columnWidths = useColumnWidths(columnCount);
+  const effectiveColumnCount = useResponsiveColumns(columnCount);
+  const columnWidths = useColumnWidths(effectiveColumnCount);
   const paneHeights = usePaneHeights();
 
   const [modes, setModes] = useState<Record<string, ViewMode>>(() =>
@@ -117,7 +119,7 @@ export function App() {
   );
 
   const [poll, controls] = useDiffPoll(params, intervalMs, frozen, autoPoll);
-  const { data, connected, lastUpdated, changed, pending } = poll;
+  const { data, connected, lastUpdated, changed, pending, slow } = poll;
 
   // If the zoomed file vanishes from the diff (reverted, staged away), drop
   // the zoom instead of showing a stale/empty overlay.
@@ -155,8 +157,8 @@ export function App() {
   }, [data, sortMode, frozen, changed, hiddenDirs]);
 
   const columns = useMemo(
-    () => assignColumns(orderedFiles, columnCount),
-    [orderedFiles, columnCount],
+    () => assignColumns(orderedFiles, effectiveColumnCount),
+    [orderedFiles, effectiveColumnCount],
   );
 
   // Markdown files default to full view (rendered preview) unless the user has
@@ -405,6 +407,11 @@ export function App() {
           {data.state.operation} in progress — the diff may be misleading.
         </div>
       )}
+      {connected && slow && (
+        <div className="banner warn">
+          computing diff is taking a while — this repo or change set may be large…
+        </div>
+      )}
 
       <div className="main">
         {treeOpen && data && (
@@ -428,7 +435,9 @@ export function App() {
               <FragmentColumn key={ci}>
                 <div
                   className="column"
-                  style={{ flex: `${columnWidths.ratios[ci] ?? 1 / columnCount} 1 0` }}
+                  style={{
+                    flex: `${columnWidths.ratios[ci] ?? 1 / effectiveColumnCount} 1 0`,
+                  }}
                 >
                   {col.map((file) => (
                     <Pane

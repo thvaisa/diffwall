@@ -17,6 +17,8 @@ export interface PollState {
   /** Wall-clock ms of the last successful poll, for the "updated Ns ago" label. */
   lastUpdated: number | null;
   loading: boolean;
+  /** True once the in-flight poll has taken longer than SLOW_THRESHOLD_MS. */
+  slow: boolean;
   /** Per-path change flags from the most recent applied poll (for flashing). */
   changed: Map<string, ChangeKind>;
   /** When frozen: number of files that changed/appeared/vanished since freezing. */
@@ -29,6 +31,10 @@ export interface PollControls {
 }
 
 const MAX_BACKOFF = 15000;
+/** How long a poll may run before we flag it as slow, so people know a heavy
+ *  diff (huge repo, big rename, etc.) is being computed rather than the UI
+ *  being stuck. */
+const SLOW_THRESHOLD_MS = 3000;
 
 export function useDiffPoll(
   params: DiffParams,
@@ -43,6 +49,7 @@ export function useDiffPoll(
     connected: true,
     lastUpdated: null,
     loading: false,
+    slow: false,
     changed: new Map(),
     pending: 0,
     error: null,
@@ -100,7 +107,10 @@ export function useDiffPoll(
     inFlight.current?.abort();
     const ac = new AbortController();
     inFlight.current = ac;
-    setState((s) => ({ ...s, loading: true }));
+    setState((s) => ({ ...s, loading: true, slow: false }));
+    const slowTimer = window.setTimeout(() => {
+      setState((s) => (s.loading ? { ...s, slow: true } : s));
+    }, SLOW_THRESHOLD_MS);
     try {
       const d = await fetchDiff(paramsRef.current, ac.signal);
       backoff.current = 0;
@@ -111,6 +121,7 @@ export function useDiffPoll(
           ...s,
           connected: true,
           loading: false,
+          slow: false,
           error: null,
           pending: countPending(d),
         }));
@@ -122,6 +133,7 @@ export function useDiffPoll(
           connected: true,
           lastUpdated: Date.now(),
           loading: false,
+          slow: false,
           changed: changes,
           pending: 0,
           error: null,
@@ -137,8 +149,11 @@ export function useDiffPoll(
         ...s,
         connected: false,
         loading: false,
+        slow: false,
         error: e instanceof Error ? e.message : String(e),
       }));
+    } finally {
+      window.clearTimeout(slowTimer);
     }
   }, [computeChanges]);
 
