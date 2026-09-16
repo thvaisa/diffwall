@@ -18,7 +18,6 @@ import { listRefs, refExists, repoRoot as resolveRepoRoot } from "./git.js";
 import { buildDiffResponse, buildFileResponse, type BuildOptions } from "./buildDiff.js";
 
 interface Cli {
-  repo: string;
   base: string;
   port: number;
   interval: number;
@@ -30,7 +29,6 @@ interface Cli {
 
 function parseCli(argv: string[]): Cli {
   const cli: Cli = {
-    repo: process.cwd(),
     base: "HEAD",
     port: 7777,
     interval: 2000,
@@ -50,9 +48,6 @@ function parseCli(argv: string[]): Cli {
       return v;
     };
     switch (a) {
-      case "--repo":
-        cli.repo = resolve(next());
-        break;
       case "--base":
         cli.base = next();
         break;
@@ -90,7 +85,7 @@ function parseCli(argv: string[]): Cli {
 
 function printHelp(): void {
   console.log(
-    `diffwall [--repo <path>] [--base <ref>] [--port 7777] [--interval 2000]
+    `diffwall [--base <ref>] [--port 7777] [--interval 2000]
          [--context 3] [--no-untracked] [--theme one-dark-pro] [--open]`,
   );
 }
@@ -188,7 +183,7 @@ async function main(): Promise<void> {
 
   let root: string;
   try {
-    root = await resolveRepoRoot(cli.repo);
+    root = await resolveRepoRoot(process.cwd());
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
@@ -341,18 +336,9 @@ function openInVsCode(
 }
 
 function openBrowser(url: string): void {
-  if (process.platform === "win32") {
-    // `start` is a cmd builtin; the empty title prevents URLs beginning with
-    // a quote from being interpreted as the window title.
-    execFile("cmd.exe", ["/c", "start", "", url], () => {
-      /* best effort; ignore failure */
-    });
-  } else {
-    const command = process.platform === "darwin" ? "open" : "xdg-open";
-    execFile(command, [url], () => {
-      /* best effort; ignore failure */
-    });
-  }
+  execFile("xdg-open", [url], () => {
+    /* best effort; ignore failure */
+  });
 }
 
 main();
