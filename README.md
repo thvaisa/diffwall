@@ -74,13 +74,16 @@ URL. The setup screen will list the Git roots under `~/projects`, and selected
 repositories appear as tabs. Git commands and file reads stay on the SSH host;
 the browser only receives the forwarded HTTP connection.
 
-### Apptainer on the SSH host
+### Apptainer or Singularity on the SSH host
 
-Apptainer can package Node, Git, dependencies, and the built application into
-one image. Build the image from the repository directory:
+Apptainer and Singularity can run the same OCI-based image. The definition
+packages Node, Git, dependencies, and the built application into one image.
+Build it from the repository directory with either runtime:
 
 ```bash
 apptainer build diffwall.sif apptainer/diffwall.def
+# or:
+singularity build diffwall.sif apptainer/diffwall.def
 ```
 
 Then run it against a host directory containing one or more repositories:
@@ -89,6 +92,10 @@ Then run it against a host directory containing one or more repositories:
 bash apptainer/run-diffwall.sh \
   diffwall.sif "$HOME/projects" 7777
 ```
+
+The launcher automatically chooses Apptainer first, then Singularity. To force
+one explicitly, set `CONTAINER_RUNTIME=apptainer` or
+`CONTAINER_RUNTIME=singularity`.
 
 The workspace is mounted read-only at `/workspace`; agent processes on the host
 can continue editing the real files and Diffwall will see those changes.

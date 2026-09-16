@@ -27,6 +27,7 @@ import type { RepositoryInfo } from "../shared/types.js";
 
 export function App() {
   const [workspace, setWorkspace] = useState<{
+    launchRoot: string;
     repositories: RepositoryInfo[];
     setupRequired: boolean;
   } | null>(null);
@@ -42,10 +43,21 @@ export function App() {
             w.repositories.find((repo) => repo.id === requested) ??
             w.repositories[0];
           setSelected([initial.id]);
+        } else if (w.setupRequired) {
+          const saved = loadSelectedRepositories(w.launchRoot, w.repositories);
+          if (saved.length > 0) setSelected(saved);
         }
       })
-      .catch(() => setWorkspace({ repositories: [], setupRequired: true }));
+      .catch(() =>
+        setWorkspace({ launchRoot: "", repositories: [], setupRequired: true }),
+      );
   }, []);
+
+  useEffect(() => {
+    if (workspace?.setupRequired) {
+      saveSelectedRepositories(workspace.launchRoot, selected);
+    }
+  }, [workspace, selected]);
 
   if (!workspace) {
     return <div className="workspace-message">loading workspace…</div>;
@@ -92,6 +104,39 @@ export function App() {
       />
     </div>
   );
+}
+
+function selectionStorageKey(launchRoot: string): string {
+  return `diffwall:selected-repositories:${launchRoot}`;
+}
+
+function loadSelectedRepositories(
+  launchRoot: string,
+  repositories: RepositoryInfo[],
+): string[] {
+  try {
+    const raw = sessionStorage.getItem(selectionStorageKey(launchRoot));
+    if (!raw) return [];
+    const saved = JSON.parse(raw);
+    if (!Array.isArray(saved)) return [];
+    const available = new Set(repositories.map((repo) => repo.id));
+    return saved.filter(
+      (id): id is string => typeof id === "string" && available.has(id),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveSelectedRepositories(launchRoot: string, selected: string[]): void {
+  try {
+    sessionStorage.setItem(
+      selectionStorageKey(launchRoot),
+      JSON.stringify(selected),
+    );
+  } catch {
+    // Session storage can be disabled; selection still works for this page.
+  }
 }
 
 function RepositorySetup({
