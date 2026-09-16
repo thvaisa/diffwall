@@ -13,9 +13,15 @@ import type {
   HealthResponse,
   OpenResponse,
   RefsResponse,
+  WorkspaceResponse,
 } from "../shared/types.js";
-import { listRefs, refExists, repoRoot as resolveRepoRoot } from "./git.js";
+import { listRefs, refExists } from "./git.js";
 import { buildDiffResponse, buildFileResponse, type BuildOptions } from "./buildDiff.js";
+import {
+  createRepositoryRegistry,
+  findRepository,
+  type RepositoryRegistry,
+} from "./repositories.js";
 
 interface Cli {
   base: string;
@@ -180,24 +186,21 @@ async function serveStatic(res: ServerResponse, urlPath: string): Promise<void> 
 
 async function main(): Promise<void> {
   const cli = parseCli(process.argv.slice(2));
-
-  let root: string;
-  try {
-    root = await resolveRepoRoot(process.cwd());
-  } catch (err) {
-    console.error(err instanceof Error ? err.message : String(err));
-    process.exit(1);
-  }
+  const registry = await createRepositoryRegistry(process.cwd());
 
   const server = createServer((req, res) => {
-    handle(req, res, cli, root).catch((err) => {
+    handle(req, res, cli, registry).catch((err) => {
       sendJson(res, 500, { error: err instanceof Error ? err.message : String(err) });
     });
   });
 
   server.listen(cli.port, "127.0.0.1", () => {
     const url = `http://127.0.0.1:${cli.port}`;
-    console.log(`diffwall serving ${root}`);
+    console.log(
+      registry.setupRequired
+        ? `diffwall waiting for repository selection under ${registry.launchRoot}`
+        : `diffwall serving ${registry.repositories[0]!.root}`,
+    );
     console.log(`  base=${cli.base} interval=${cli.interval}ms context=${cli.context}`);
     console.log(`  ${url}`);
     if (cli.open) openBrowser(url);
@@ -208,20 +211,53 @@ async function handle(
   req: IncomingMessage,
   res: ServerResponse,
   cli: Cli,
-  root: string,
+  registry: RepositoryRegistry,
 ): Promise<void> {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   const path = url.pathname;
 
-  if (path === "/api/health") {
-    const body: HealthResponse = { ok: true, repo: root, pid: process.pid };
+  if (path === "/api/workspace") {
+    const body: WorkspaceResponse = {
+      launchRoot: registry.launchRoot,
+      setupRequired: registry.setupRequired,
+      repositories: registry.repositories.map((repo) => repo.info),
+    };
     sendJson(res, 200, body);
     return;
   }
 
+  if (path === "/api/health") {
+    const body: HealthResponse = {
+      ok: true,
+      launchRoot: registry.launchRoot,
+      setupRequired: registry.setupRequired,
+      repositories: registry.repositories.map((repo) => repo.info),
+      pid: process.pid,
+    };
+    sendJson(res, 200, body);
+    return;
+  }
+
+  if (!path.startsWith("/api/")) {
+    await serveStatic(res, path);
+    return;
+  }
+
+  const repo = findRepository(registry, url.searchParams.get("repo"));
+  if (!repo) {
+    sendJson(
+      res,
+      400,
+      { error: "missing or invalid repository selection" },
+    );
+    return;
+  }
+  const root = repo.root;
+  const repoId = repo.info.id;
+
   if (path === "/api/refs") {
     const refs = await listRefs(root);
-    const body: RefsResponse = refs;
+    const body: RefsResponse = { repoId, ...refs };
     sendJson(res, 200, body);
     return;
   }
@@ -240,6 +276,7 @@ async function handle(
       return;
     }
     const opts: BuildOptions = {
+      repoId,
       repoRoot: root,
       base,
       context,
@@ -271,6 +308,7 @@ async function handle(
       return;
     }
     const opts: BuildOptions = {
+      repoId,
       repoRoot: root,
       base,
       context,
@@ -284,16 +322,26 @@ async function handle(
   }
 
   if (path === "/api/open" && req.method === "POST") {
-    let parsed: { path?: unknown; line?: unknown };
+    let parsed: { path?: unknown; line?: unknown; repoId?: unknown };
     try {
       parsed = JSON.parse(await readBody(req));
     } catch {
       sendJson(res, 200, { ok: false, error: "invalid body" } satisfies OpenResponse);
       return;
     }
+    const requestedRepoId =
+      typeof parsed.repoId === "string" ? parsed.repoId : repoId;
+    const requestedRepo = findRepository(registry, requestedRepoId);
+    if (!requestedRepo) {
+      sendJson(res, 200, {
+        ok: false,
+        error: "invalid repository selection",
+      } satisfies OpenResponse);
+      return;
+    }
     const rel = typeof parsed.path === "string" ? parsed.path : "";
     const line = typeof parsed.line === "number" ? parsed.line : 1;
-    const abs = rel ? resolveInRepo(root, rel) : null;
+    const abs = rel ? resolveInRepo(requestedRepo.root, rel) : null;
     if (!abs) {
       sendJson(res, 200, {
         ok: false,

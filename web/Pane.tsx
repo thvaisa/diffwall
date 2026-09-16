@@ -31,6 +31,7 @@ const STATUS_TAG: Record<string, string> = {
 const ROW_HEIGHT = 17; // must match .line height in CSS (12px * 1.45 ≈ 17.4, floored)
 
 interface Props {
+  repoId: string;
   file: FileDiff;
   base: string;
   mode: ViewMode;
@@ -53,6 +54,7 @@ interface Props {
 }
 
 function PaneImpl({
+  repoId,
   file,
   base,
   mode,
@@ -69,7 +71,7 @@ function PaneImpl({
   onToggleZoom,
 }: Props) {
   const [collapsed, setCollapsed] = useState(false);
-  const interact = useLineInteract(file, tray);
+  const interact = useLineInteract(repoId, file, tray);
   const paneRef = useRef<HTMLDivElement | null>(null);
 
   // Drag the bottom edge to set an explicit height; double-click clears it.
@@ -183,13 +185,14 @@ function PaneImpl({
               file={file}
               base={base}
               focused={focused}
+              repoId={repoId}
               path={file.path}
               interact={interact}
               onRegisterNav={onRegisterNav}
               zoomed={zoomed}
             />
           ) : (
-            <DiffBody file={file} base={base} interact={interact} />
+            <DiffBody repoId={repoId} file={file} base={base} interact={interact} />
           )}
         </div>
       )}
@@ -209,10 +212,12 @@ function PaneImpl({
 // ---- Diff view with gap expansion --------------------------------------------
 
 function DiffBody({
+  repoId,
   file,
   base,
   interact,
 }: {
+  repoId: string;
   file: FileDiff;
   base: string;
   interact: LineInteract;
@@ -221,7 +226,7 @@ function DiffBody({
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
   const needFull = expanded.size > 0;
   const side = file.status === FileStatus.Deleted ? "old" : "new";
-  const full = useFullFile(file.path, base, file.hash, side, needFull);
+  const full = useFullFile(repoId, file.path, base, file.hash, side, needFull);
 
   if (file.error) return <div className="pane-note error">error: {file.error}</div>;
   if (file.binary) return <div className="pane-note">binary file — no text diff</div>;
@@ -324,6 +329,7 @@ function lastNew(h: FileDiff["hunks"][number]): number {
 // ---- Full-file view (virtualized) --------------------------------------------
 
 function FullBody({
+  repoId,
   file,
   base,
   focused,
@@ -332,6 +338,7 @@ function FullBody({
   onRegisterNav,
   zoomed,
 }: {
+  repoId: string;
   file: FileDiff;
   base: string;
   focused: boolean;
@@ -341,7 +348,14 @@ function FullBody({
   zoomed?: boolean;
 }) {
   const side = file.status === FileStatus.Deleted ? "old" : "new";
-  const { data, loading, error } = useFullFile(file.path, base, file.hash, side, true);
+  const { data, loading, error } = useFullFile(
+    repoId,
+    file.path,
+    base,
+    file.hash,
+    side,
+    true,
+  );
   const vlRef = useRef<VirtualLinesHandle | null>(null);
   const cursor = useRef(-1);
   const [showSource, setShowSource] = useState(false);

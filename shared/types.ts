@@ -96,6 +96,7 @@ export interface RepoState {
 }
 
 export interface DiffResponse {
+  repoId: string;
   repo: string;
   base: string;
   /** Short HEAD hash, or null on an empty repo. */
@@ -109,6 +110,7 @@ export interface DiffResponse {
 }
 
 export interface FileResponse {
+  repoId: string;
   path: string;
   lang: string;
   truncated: boolean;
@@ -117,17 +119,27 @@ export interface FileResponse {
 
 export interface HealthResponse {
   ok: true;
-  repo: string;
+  launchRoot: string;
+  setupRequired: boolean;
+  repositories: RepositoryInfo[];
   pid: number;
 }
 
+export interface RepositoryInfo {
+  id: string;
+  label: string;
+  relativePath: string;
+}
+
 export interface RefsResponse {
+  repoId: string;
   branches: string[];
   tags: string[];
   head: string;
 }
 
 export interface OpenRequest {
+  repoId: string;
   path: string;
   line: number;
 }
@@ -139,4 +151,10 @@ export interface OpenResponse {
 
 export interface ApiError {
   error: string;
+}
+
+export interface WorkspaceResponse {
+  launchRoot: string;
+  setupRequired: boolean;
+  repositories: RepositoryInfo[];
 }

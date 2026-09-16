@@ -5,9 +5,11 @@ import type {
   FileResponse,
   HealthResponse,
   OpenResponse,
+  WorkspaceResponse,
 } from "../shared/types.js";
 
 export interface DiffParams {
+  repoId: string;
   base: string;
   context: number;
   untracked: boolean;
@@ -19,6 +21,7 @@ export async function fetchDiff(
   signal?: AbortSignal,
 ): Promise<DiffResponse> {
   const q = new URLSearchParams({
+    repo: params.repoId,
     base: params.base,
     context: String(params.context),
     untracked: params.untracked ? "1" : "0",
@@ -33,12 +36,13 @@ export async function fetchDiff(
 }
 
 export async function fetchFile(
+  repoId: string,
   path: string,
   base: string,
   side: "new" | "old",
   signal?: AbortSignal,
 ): Promise<FileResponse> {
-  const q = new URLSearchParams({ path, base, side });
+  const q = new URLSearchParams({ repo: repoId, path, base, side });
   const res = await fetch(`/api/file?${q}`, { signal });
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -54,13 +58,22 @@ export async function fetchHealth(signal?: AbortSignal): Promise<HealthResponse>
 }
 
 export async function openInVsCode(
+  repoId: string,
   path: string,
   line: number,
 ): Promise<OpenResponse> {
-  const res = await fetch("/api/open", {
+  const res = await fetch(`/api/open?repo=${encodeURIComponent(repoId)}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ path, line }),
+    body: JSON.stringify({ repoId, path, line }),
   });
   return (await res.json()) as OpenResponse;
+}
+
+export async function fetchWorkspace(
+  signal?: AbortSignal,
+): Promise<WorkspaceResponse> {
+  const res = await fetch("/api/workspace", { signal });
+  if (!res.ok) throw new Error(`workspace failed: ${res.status}`);
+  return (await res.json()) as WorkspaceResponse;
 }

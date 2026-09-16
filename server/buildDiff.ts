@@ -35,6 +35,7 @@ const MAX_DIFF_LINES_PER_FILE = 2000;
 const MAX_FULL_FILE_LINES = 20000;
 
 export interface BuildOptions {
+  repoId: string;
   repoRoot: string;
   base: string;
   context: number;
@@ -297,6 +298,7 @@ export async function buildDiffResponse(opts: BuildOptions): Promise<DiffRespons
   }
 
   return {
+    repoId: opts.repoId,
     repo: repoRoot,
     base,
     head,
@@ -334,7 +336,7 @@ export async function buildFileResponse(
       new: null,
       html,
     }));
-    return { path, lang, truncated: cap.truncated, lines };
+    return { repoId: opts.repoId, path, lang, truncated: cap.truncated, lines };
   }
 
   // New side: whole new file with deleted lines spliced in. We walk the full
@@ -366,7 +368,7 @@ export async function buildFileResponse(
     for (let n = 1; n <= newTotal; n++) {
       lines.push({ kind: LineKind.Ctx, old: n, new: n, html: newHi[n - 1] ?? "" });
     }
-    return { path, lang, truncated: cap.truncated, lines };
+    return { repoId: opts.repoId, path, lang, truncated: cap.truncated, lines };
   }
 
   // With full context there is a single hunk covering the file. Emit its lines
@@ -401,7 +403,7 @@ export async function buildFileResponse(
     lines.push({ kind: LineKind.Ctx, old: null, new: n, html: newHi[n - 1] ?? "" });
   }
 
-  return { path, lang, truncated: cap.truncated, lines };
+  return { repoId: opts.repoId, path, lang, truncated: cap.truncated, lines };
 }
 
 function capLines(content: string, max: number): { content: string; truncated: boolean } {

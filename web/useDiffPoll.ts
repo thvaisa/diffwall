@@ -194,6 +194,7 @@ export function useDiffPoll(
   }, [
     poll,
     autoPoll,
+    params.repoId,
     params.base,
     params.context,
     params.untracked,

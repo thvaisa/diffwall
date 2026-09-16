@@ -22,37 +22,154 @@ import { BaseSelect } from "./BaseSelect.js";
 import { HelpOverlay } from "./HelpOverlay.js";
 import { FileTree } from "./FileTree.js";
 import { isHidden } from "./fileTree.js";
+import { fetchWorkspace } from "./api.js";
+import type { RepositoryInfo } from "../shared/types.js";
 
 export function App() {
+  const [workspace, setWorkspace] = useState<{
+    repositories: RepositoryInfo[];
+    setupRequired: boolean;
+  } | null>(null);
+  const [selected, setSelected] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchWorkspace()
+      .then((w) => {
+        setWorkspace(w);
+        if (!w.setupRequired && w.repositories[0]) {
+          const requested = new URLSearchParams(location.search).get("repo");
+          const initial =
+            w.repositories.find((repo) => repo.id === requested) ??
+            w.repositories[0];
+          setSelected([initial.id]);
+        }
+      })
+      .catch(() => setWorkspace({ repositories: [], setupRequired: true }));
+  }, []);
+
+  if (!workspace) {
+    return <div className="workspace-message">loading workspace…</div>;
+  }
+  if (workspace.setupRequired && selected.length === 0) {
+    return (
+      <RepositorySetup
+        repositories={workspace.repositories}
+        onStart={setSelected}
+      />
+    );
+  }
+  const active = selected[0] ?? workspace.repositories[0]?.id;
+  if (!active) {
+    return <div className="workspace-message">no Git repositories found</div>;
+  }
+  return (
+    <div className="workspace">
+      <div className="repo-tabs">
+        {selected.map((id) => {
+          const repo = workspace.repositories.find((r) => r.id === id);
+          if (!repo) return null;
+          return (
+            <button
+              key={id}
+              className={id === active ? "active" : ""}
+              onClick={() => setSelected((ids) => [id, ...ids.filter((x) => x !== id)])}
+              title={repo.relativePath || repo.label}
+            >
+              {repo.label}
+            </button>
+          );
+        })}
+        <button className="workspace-change" onClick={() => setSelected([])}>
+          choose repos
+        </button>
+      </div>
+      <RepoWall
+        key={active}
+        repoId={active}
+        repoLabel={
+          workspace.repositories.find((r) => r.id === active)?.label ?? active
+        }
+      />
+    </div>
+  );
+}
+
+function RepositorySetup({
+  repositories,
+  onStart,
+}: {
+  repositories: RepositoryInfo[];
+  onStart: (ids: string[]) => void;
+}) {
+  const [selected, setSelected] = useState<Set<string>>(
+    () => new Set(repositories.map((r) => r.id)),
+  );
+  return (
+    <div className="workspace-message setup">
+      <h1>Choose repositories</h1>
+      <p>Select the Git roots to show as Diffwall tabs.</p>
+      <div className="repo-picker">
+        {repositories.map((repo) => (
+          <label key={repo.id}>
+            <input
+              type="checkbox"
+              checked={selected.has(repo.id)}
+              onChange={() =>
+                setSelected((current) => {
+                  const next = new Set(current);
+                  if (next.has(repo.id)) next.delete(repo.id);
+                  else next.add(repo.id);
+                  return next;
+                })
+              }
+            />
+            <span>
+              <strong>{repo.label}</strong>
+              <small>{repo.relativePath || "."}</small>
+            </span>
+          </label>
+        ))}
+      </div>
+      <button
+        disabled={selected.size === 0}
+        onClick={() => onStart(repositories.filter((r) => selected.has(r.id)).map((r) => r.id))}
+      >
+        open selected repositories
+      </button>
+    </div>
+  );
+}
+
+function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) {
   // URL query overrides localStorage on first load (bookmarkable / per-tab).
   const url = readUrlSettings();
 
   const [base, setBase] = useState(url.base ?? "HEAD");
   const [columnCount, setColumnCount] = useState(
-    () => url.columns ?? loadJson<number>("columns", 3),
+    () => url.columns ?? loadJson<number>(`${repoId}:columns`, 3),
   );
   const [context] = useState(3);
   const [untracked] = useState(true);
   const [intervalMs, setIntervalMs] = useState(
-    () => url.interval ?? loadJson<number>("interval", 2000),
+    () => url.interval ?? loadJson<number>(`${repoId}:interval`, 2000),
   );
   const [autoPoll, setAutoPoll] = useState(
-    () => url.auto ?? loadJson<boolean>("autoPoll", true),
+    () => url.auto ?? loadJson<boolean>(`${repoId}:autoPoll`, true),
   );
   const [frozen, setFrozen] = useState(false);
   const [sortMode, setSortMode] = useState<SortMode>(
-    () => (url.sort as SortMode) ?? loadJson<SortMode>("sort", SortMode.Path),
+    () => (url.sort as SortMode) ?? loadJson<SortMode>(`${repoId}:sort`, SortMode.Path),
   );
   const [defaultMode, setDefaultMode] = useState<ViewMode>(() => {
     if (url.view === ViewMode.Full || url.view === ViewMode.Diff) return url.view;
-    return loadJson<ViewMode>("defaultMode", ViewMode.Diff);
+    return loadJson<ViewMode>(`${repoId}:defaultMode`, ViewMode.Diff);
   });
   const [helpOpen, setHelpOpen] = useState(false);
   const [treeOpen, setTreeOpen] = useState(() =>
-    loadJson<boolean>("treeOpen", false),
+    loadJson<boolean>(`${repoId}:treeOpen`, false),
   );
   const [hiddenDirs, setHiddenDirs] = useState<Set<string>>(
-    () => new Set(loadJson<string[]>("hiddenDirs", [])),
+    () => new Set(loadJson<string[]>(`${repoId}:hiddenDirs`, [])),
   );
 
   const effectiveColumnCount = useResponsiveColumns(columnCount);
@@ -60,24 +177,24 @@ export function App() {
   const paneHeights = usePaneHeights();
 
   const [modes, setModes] = useState<Record<string, ViewMode>>(() =>
-    loadJson<Record<string, ViewMode>>("modes", {}),
+    loadJson<Record<string, ViewMode>>(`${repoId}:modes`, {}),
   );
   const [focused, setFocused] = useState<string | null>(null);
   const [zoomed, setZoomed] = useState<string | null>(null);
 
-  const tray = useReferences();
-  const notes = useNotes();
+  const tray = useReferences(repoId);
+  const notes = useNotes(repoId);
 
-  useEffect(() => saveJson("columns", columnCount), [columnCount]);
-  useEffect(() => saveJson("defaultMode", defaultMode), [defaultMode]);
-  useEffect(() => saveJson("modes", modes), [modes]);
-  useEffect(() => saveJson("interval", intervalMs), [intervalMs]);
-  useEffect(() => saveJson("sort", sortMode), [sortMode]);
-  useEffect(() => saveJson("autoPoll", autoPoll), [autoPoll]);
-  useEffect(() => saveJson("treeOpen", treeOpen), [treeOpen]);
+  useEffect(() => saveJson(`${repoId}:columns`, columnCount), [repoId, columnCount]);
+  useEffect(() => saveJson(`${repoId}:defaultMode`, defaultMode), [repoId, defaultMode]);
+  useEffect(() => saveJson(`${repoId}:modes`, modes), [repoId, modes]);
+  useEffect(() => saveJson(`${repoId}:interval`, intervalMs), [repoId, intervalMs]);
+  useEffect(() => saveJson(`${repoId}:sort`, sortMode), [repoId, sortMode]);
+  useEffect(() => saveJson(`${repoId}:autoPoll`, autoPoll), [repoId, autoPoll]);
+  useEffect(() => saveJson(`${repoId}:treeOpen`, treeOpen), [repoId, treeOpen]);
   useEffect(
-    () => saveJson("hiddenDirs", [...hiddenDirs]),
-    [hiddenDirs],
+    () => saveJson(`${repoId}:hiddenDirs`, [...hiddenDirs]),
+    [repoId, hiddenDirs],
   );
 
   const toggleHiddenDir = useCallback((dirPath: string) => {
@@ -105,6 +222,7 @@ export function App() {
   // Mirror settings into the URL so a configured view is bookmarkable and each
   // tab can carry its own config independent of shared localStorage.
   useUrlSync({
+    repoId,
     base,
     columns: columnCount,
     view: defaultMode,
@@ -114,8 +232,8 @@ export function App() {
   });
 
   const params = useMemo(
-    () => ({ base, context, untracked, whitespace: false }),
-    [base, context, untracked],
+    () => ({ repoId, base, context, untracked, whitespace: false }),
+    [repoId, base, context, untracked],
   );
 
   const [poll, controls] = useDiffPoll(params, intervalMs, frozen, autoPoll);
@@ -299,11 +417,16 @@ export function App() {
         >
           ☰
         </button>
-        <span className="brand">diffwall</span>
+        <span className="brand">diffwall · {repoLabel}</span>
 
         <label>
           base
-          <BaseSelect value={base} onChange={setBase} inputRef={baseInputRef} />
+          <BaseSelect
+            repoId={repoId}
+            value={base}
+            onChange={setBase}
+            inputRef={baseInputRef}
+          />
         </label>
 
         <label>
@@ -441,6 +564,7 @@ export function App() {
                 >
                   {col.map((file) => (
                     <Pane
+                      repoId={repoId}
                       key={file.path}
                       file={file}
                       base={data!.base}
@@ -483,6 +607,7 @@ export function App() {
           <div className="zoom-overlay" onMouseDown={() => setZoomed(null)}>
             <div className="zoom-frame" onMouseDown={(e) => e.stopPropagation()}>
               <Pane
+                repoId={repoId}
                 file={file}
                 base={data.base}
                 mode={modeFor(file.path)}

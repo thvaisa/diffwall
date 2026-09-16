@@ -4,7 +4,8 @@
 
 A local, browser-based, read-only diff wall. Shows every changed file in a git
 repo as a pane, tiled across a large screen, refreshing itself while coding
-agents work. Local Linux only — repo, agents, server, and browser on one box.
+agents work. It can watch one repository or several repositories in one
+workspace.
 
 Read-only: it reads git and the working tree and never writes to the repo. It is
 immune to *how* an edit was made — `sed`, a heredoc, an editor, or an agent all
@@ -14,7 +15,7 @@ show up identically, and untracked files appear without `git add`.
 
 - **Node 20+** (pinned in `.nvmrc` and `engines`). Use `nvm use` to match.
 - `git` on `PATH`.
-- Linux. No Windows or remote support by design.
+- Windows, Linux, or macOS.
 
 ## Install
 
@@ -32,11 +33,17 @@ postinstall script.
 
 ## Run
 
-From anywhere inside a git repository:
+Launch it from inside a Git repository:
 
 ```bash
 node dist/server/index.js [options]      # after `npm run build`
 ```
+
+When launched inside a Git repository, Diffwall uses that repository directly.
+When launched from a non-Git directory, it recursively discovers Git roots
+under that directory and shows a browser setup screen. Select one or more
+repositories; each selected repository gets an in-app tab. Discovery is
+session-only and skips dependency/build directories.
 
 Options:
 
@@ -47,10 +54,49 @@ Options:
 --context <n>       diff context lines (default 3)
 --no-untracked      hide untracked files
 --theme <name>      one-dark-pro (default), github-dark, github-light
---open              open the browser via xdg-open
+--open              open the browser via the platform default
 ```
 
 The server binds `127.0.0.1` only and makes no outbound requests at runtime.
+
+### VS Code Remote SSH
+
+Run Diffwall on the SSH host from the parent directory containing the
+repositories:
+
+```bash
+cd ~/projects
+node ~/diffwall/dist/server/index.js --port 7777
+```
+
+Forward port `7777` in VS Code's **Ports** panel and open the forwarded local
+URL. The setup screen will list the Git roots under `~/projects`, and selected
+repositories appear as tabs. Git commands and file reads stay on the SSH host;
+the browser only receives the forwarded HTTP connection.
+
+### Apptainer on the SSH host
+
+Apptainer can package Node, Git, dependencies, and the built application into
+one image. Build the image from the repository directory:
+
+```bash
+apptainer build diffwall.sif apptainer/diffwall.def
+```
+
+Then run it against a host directory containing one or more repositories:
+
+```bash
+bash apptainer/run-diffwall.sh \
+  diffwall.sif "$HOME/projects" 7777
+```
+
+The workspace is mounted read-only at `/workspace`; agent processes on the host
+can continue editing the real files and Diffwall will see those changes.
+Forward port `7777` in VS Code's **Ports** panel. The image does not need
+Internet access while running. Internet access is normally needed once while
+building the image so the base image and npm packages can be downloaded.
+Only the workspace directory is exposed to the container; do not bind the
+entire host filesystem.
 
 ## Development
 
@@ -61,18 +107,19 @@ npm run dev:web      # vite dev server, proxies /api to the node server
 
 ## API (for reference / curl testing)
 
-- `GET /api/health` — liveness + repo root.
-- `GET /api/diff?base=<ref>&context=<n>&untracked=<0|1>&ws=<0|1>` — the wall.
-- `GET /api/file?path=<p>&base=<ref>&side=<new|old>` — full-file view.
-- `POST /api/open` `{ "path", "line" }` — VS Code fallback (primary is a
-  `vscode://file/...` link built into the payload).
+- `GET /api/workspace` — discovered repositories and setup status.
+- `GET /api/health` — liveness and repository registry.
+- `GET /api/diff?repo=<id>&base=<ref>&context=<n>&untracked=<0|1>&ws=<0|1>` — the wall.
+- `GET /api/file?repo=<id>&path=<p>&base=<ref>&side=<new|old>` — full-file view.
+- `POST /api/open` `{ "repoId", "path", "line" }` — local VS Code fallback.
 
 ## Security posture
 
 - Binds loopback only, never `0.0.0.0`.
 - `execFile` with argv arrays only — no shell, ever.
 - `--base` validated with `git rev-parse --verify` before use.
-- `/api/file` and `/api/open` reject any path that resolves outside the repo.
+- `/api/file` and `/api/open` reject any path that resolves outside the selected repo.
+- Repository selection is limited to Git roots discovered beneath the launch directory.
 - Shiki grammars ship with the package; no network at runtime.
 
 ## Known limitations

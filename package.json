@@ -19,6 +19,7 @@
     "build:server": "tsc -p tsconfig.server.json",
     "build:web": "vite build",
     "build": "npm run build:server && npm run build:web",
+    "test": "npm run build:server && node --test dist/server/repositories.test.js",
     "dev:server": "npm run build:server && node --watch dist/server/index.js",
     "dev:web": "vite",
     "start": "node dist/server/index.js",

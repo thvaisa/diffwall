@@ -8,10 +8,12 @@ import { useEffect, useState } from "react";
 import type { RefsResponse } from "../shared/types.js";
 
 export function BaseSelect({
+  repoId,
   value,
   onChange,
   inputRef,
 }: {
+  repoId: string;
   value: string;
   onChange: (base: string) => void;
   inputRef?: React.RefObject<HTMLInputElement | null>;
@@ -23,12 +25,12 @@ export function BaseSelect({
 
   useEffect(() => {
     const ac = new AbortController();
-    fetch("/api/refs", { signal: ac.signal })
+    fetch(`/api/refs?repo=${encodeURIComponent(repoId)}`, { signal: ac.signal })
       .then((r) => (r.ok ? (r.json() as Promise<RefsResponse>) : null))
       .then((d) => d && setRefs(d))
       .catch(() => {});
     return () => ac.abort();
-  }, []);
+  }, [repoId]);
 
   const commit = () => {
     const v = draft.trim();
@@ -41,7 +43,7 @@ export function BaseSelect({
       <input
         ref={inputRef}
         className="base-input"
-        list="diffwall-refs"
+        list={`diffwall-refs-${repoId}`}
         value={draft}
         spellCheck={false}
         onChange={(e) => setDraft(e.target.value)}
@@ -51,7 +53,7 @@ export function BaseSelect({
         }}
         title="base ref to diff against (read-only; type any ref or pick one)"
       />
-      <datalist id="diffwall-refs">
+      <datalist id={`diffwall-refs-${repoId}`}>
         <option value="HEAD" />
         {refs?.branches.map((b) => (
           <option key={`b:${b}`} value={b} />

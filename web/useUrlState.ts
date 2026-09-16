@@ -6,6 +6,7 @@
 import { useEffect } from "react";
 
 export interface UrlSettings {
+  repoId: string;
   base: string;
   columns: number;
   view: string;
@@ -37,6 +38,7 @@ export function readUrlSettings(): Partial<UrlSettings> {
 export function useUrlSync(settings: UrlSettings): void {
   useEffect(() => {
     const q = new URLSearchParams();
+    q.set("repo", settings.repoId);
     q.set("base", settings.base);
     q.set("columns", String(settings.columns));
     q.set("view", settings.view);
@@ -48,6 +50,7 @@ export function useUrlSync(settings: UrlSettings): void {
       history.replaceState(null, "", next);
     }
   }, [
+    settings.repoId,
     settings.base,
     settings.columns,
     settings.view,

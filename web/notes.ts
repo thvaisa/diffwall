@@ -41,12 +41,12 @@ export interface NotePad {
 let seq = 0;
 const newId = () => `n${Date.now()}_${seq++}`;
 
-export function useNotes(): NotePad {
+export function useNotes(repoId: string): NotePad {
   const [notes, setNotes] = useState<Note[]>(() =>
-    loadJson<Note[]>("notes", []),
+    loadJson<Note[]>(`${repoId}:notes`, []),
   );
 
-  useEffect(() => saveJson("notes", notes), [notes]);
+  useEffect(() => saveJson(`${repoId}:notes`, notes), [repoId, notes]);
 
   const add = useCallback((n: Omit<Note, "id">) => {
     const id = newId();

@@ -1,0 +1,39 @@
+Bootstrap: docker
+From: node:20-bookworm-slim
+
+%files
+    .npmrc /opt/diffwall/.npmrc
+    package.json /opt/diffwall/package.json
+    package-lock.json /opt/diffwall/package-lock.json
+    tsconfig.server.json /opt/diffwall/tsconfig.server.json
+    tsconfig.web.json /opt/diffwall/tsconfig.web.json
+    vite.config.ts /opt/diffwall/vite.config.ts
+    server /opt/diffwall/server
+    shared /opt/diffwall/shared
+    web /opt/diffwall/web
+
+%post
+    set -eux
+    apt-get update
+    apt-get install -y --no-install-recommends git ca-certificates
+    rm -rf /var/lib/apt/lists/*
+
+    cd /opt/diffwall
+    npm ci
+    npm run build
+    npm prune --omit=dev
+
+%environment
+    export DIFFWALL_ROOT=/workspace
+    export PATH=/opt/diffwall/node_modules/.bin:$PATH
+
+%runscript
+    cd "${DIFFWALL_ROOT}"
+    exec node /opt/diffwall/dist/server/index.js "$@"
+
+%test
+    set -eu
+    test "$(node --version | cut -d. -f1)" = "v20"
+    git --version
+    test -f /opt/diffwall/dist/server/index.js
+    test -f /opt/diffwall/dist/web/index.html

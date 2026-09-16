@@ -8,7 +8,11 @@ import type { FileDiff } from "../shared/types.js";
 import { copyText, vscodeLink, type RefTray } from "./references.js";
 import { openInVsCode } from "./api.js";
 
-export function useLineInteract(file: FileDiff, tray: RefTray): LineInteract {
+export function useLineInteract(
+  repoId: string,
+  file: FileDiff,
+  tray: RefTray,
+): LineInteract {
   const [flashed, setFlashed] = useState<number | null>(null);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const anchor = useRef<number | null>(null); // last single-clicked line
@@ -56,10 +60,10 @@ export function useLineInteract(file: FileDiff, tray: RefTray): LineInteract {
       // Fire the fallback shortly after; if the URI worked the page navigated
       // away/handled it, and the POST is harmless. If not, this opens the file.
       window.setTimeout(() => {
-        void openInVsCode(file.path, line).catch(() => {});
+        void openInVsCode(repoId, file.path, line).catch(() => {});
       }, 400);
     },
-    [file.absPath, file.path],
+    [repoId, file.absPath, file.path],
   );
 
   const onDragStart = useCallback((line: number) => {

@@ -13,6 +13,7 @@ interface State {
 }
 
 export function useFullFile(
+  repoId: string,
   path: string,
   base: string,
   hash: string,
@@ -29,12 +30,12 @@ export function useFullFile(
 
   useEffect(() => {
     if (!active) return;
-    const key = `${path}\0${base}\0${hash}\0${side}`;
+    const key = `${repoId}\0${path}\0${base}\0${hash}\0${side}`;
     if (fetchedKey.current === key && state.data) return;
 
     const ac = new AbortController();
     setState((s) => ({ ...s, loading: true, error: null }));
-    fetchFile(path, base, side, ac.signal)
+    fetchFile(repoId, path, base, side, ac.signal)
       .then((data) => {
         fetchedKey.current = key;
         setState({ data, loading: false, error: null });
@@ -46,7 +47,7 @@ export function useFullFile(
     return () => ac.abort();
     // state.data intentionally omitted: we gate on fetchedKey, not data identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, base, hash, side, active]);
+  }, [repoId, path, base, hash, side, active]);
 
   return state;
 }

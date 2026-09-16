@@ -31,12 +31,12 @@ export interface RefTray {
   copyAll: () => Promise<void>;
 }
 
-export function useReferences(): RefTray {
+export function useReferences(repoId: string): RefTray {
   const [refs, setRefs] = useState<Reference[]>(() =>
-    loadJson<Reference[]>("refs", []),
+    loadJson<Reference[]>(`${repoId}:refs`, []),
   );
 
-  useEffect(() => saveJson("refs", refs), [refs]);
+  useEffect(() => saveJson(`${repoId}:refs`, refs), [repoId, refs]);
 
   const add = useCallback((r: Reference) => {
     setRefs((cur) => (cur.some((x) => sameRef(x, r)) ? cur : [...cur, r]));
