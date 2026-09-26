@@ -14,7 +14,10 @@ import { RefTray } from "./RefTray.js";
 import { useNotes } from "./notes.js";
 import { NotePad } from "./NotePad.js";
 import { useDiffPoll } from "./useDiffPoll.js";
-import { useResponsiveColumns } from "./useResponsiveColumns.js";
+import {
+  DEFAULT_MIN_COLUMN_CHARS,
+  useResponsiveColumns,
+} from "./useResponsiveColumns.js";
 import { useColumnWidths } from "./useColumnWidths.js";
 import { usePaneHeights } from "./usePaneHeights.js";
 import { readUrlSettings, useUrlSync } from "./useUrlState.js";
@@ -153,6 +156,12 @@ function RepositorySetup({
     <div className="workspace-message setup">
       <h1>Choose repositories</h1>
       <p>Select the Git roots to show as Diffwall tabs.</p>
+      <div className="repo-picker-actions">
+        <button onClick={() => setSelected(new Set(repositories.map((r) => r.id)))}>
+          select all
+        </button>
+        <button onClick={() => setSelected(new Set())}>unselect all</button>
+      </div>
       <div className="repo-picker">
         {repositories.map((repo) => (
           <label key={repo.id}>
@@ -193,6 +202,11 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
   const [columnCount, setColumnCount] = useState(
     () => url.columns ?? loadJson<number>(`${repoId}:columns`, 3),
   );
+  const [minColumnChars, setMinColumnChars] = useState(
+    () =>
+      url.minColWidth ??
+      loadJson<number>(`${repoId}:minColWidth`, DEFAULT_MIN_COLUMN_CHARS),
+  );
   const [context] = useState(3);
   const [untracked] = useState(true);
   const [intervalMs, setIntervalMs] = useState(
@@ -217,7 +231,7 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
     () => new Set(loadJson<string[]>(`${repoId}:hiddenDirs`, [])),
   );
 
-  const effectiveColumnCount = useResponsiveColumns(columnCount);
+  const effectiveColumnCount = useResponsiveColumns(columnCount, minColumnChars);
   const columnWidths = useColumnWidths(effectiveColumnCount);
   const paneHeights = usePaneHeights();
 
@@ -231,6 +245,10 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
   const notes = useNotes(repoId);
 
   useEffect(() => saveJson(`${repoId}:columns`, columnCount), [repoId, columnCount]);
+  useEffect(
+    () => saveJson(`${repoId}:minColWidth`, minColumnChars),
+    [repoId, minColumnChars],
+  );
   useEffect(() => saveJson(`${repoId}:defaultMode`, defaultMode), [repoId, defaultMode]);
   useEffect(() => saveJson(`${repoId}:modes`, modes), [repoId, modes]);
   useEffect(() => saveJson(`${repoId}:interval`, intervalMs), [repoId, intervalMs]);
@@ -274,6 +292,7 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
     sort: sortMode,
     interval: intervalMs,
     auto: autoPoll,
+    minColWidth: minColumnChars,
   });
 
   const params = useMemo(
@@ -488,6 +507,18 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
           </select>
         </label>
 
+        <label title="minimum column width (in characters) before columns auto-shrink to fit the window">
+          min width
+          <SteppedNumberInput
+            value={minColumnChars}
+            min={MIN_COLUMN_CHARS_FLOOR}
+            step={MIN_COLUMN_CHARS_STEP}
+            onCommit={setMinColumnChars}
+            title="minimum column width (ch); applies on Enter or blur"
+          />
+          ch
+        </label>
+
         <label>
           view
           <select
@@ -523,10 +554,13 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
 
         <label>
           every
-          <IntervalInput
+          <SteppedNumberInput
             value={intervalMs}
+            min={MIN_INTERVAL}
+            step={INTERVAL_STEP}
             disabled={!autoPoll}
             onCommit={setIntervalMs}
+            title="poll interval (ms); applies on Enter or blur"
           />
           ms
         </label>
@@ -678,20 +712,32 @@ function FragmentColumn({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Poll-interval field. A plain text box (no native number spinner — its arrows
-// fired onChange but never committed) flanked by explicit − / + steppers that
-// apply immediately. Typing holds free text so you can clear and retype without
-// it fighting back; it commits on Enter or blur. Arrow keys also step.
 const MIN_INTERVAL = 250;
-const STEP = 250;
-function IntervalInput({
+const INTERVAL_STEP = 250;
+// Floor low enough to allow quite narrow columns, but not so low the pane
+// chrome (line-number gutter, padding) stops fitting.
+const MIN_COLUMN_CHARS_FLOOR = 40;
+const MIN_COLUMN_CHARS_STEP = 8;
+
+// A plain text box (no native number spinner — its arrows fired onChange but
+// never committed) flanked by explicit − / + steppers that apply immediately.
+// Typing holds free text so you can clear and retype without it fighting
+// back; it commits on Enter or blur. Arrow keys also step. Shared by the
+// poll-interval and min-column-width toolbar fields.
+function SteppedNumberInput({
   value,
+  min,
+  step: stepSize,
   disabled,
+  title,
   onCommit,
 }: {
   value: number;
-  disabled: boolean;
-  onCommit: (ms: number) => void;
+  min: number;
+  step: number;
+  disabled?: boolean;
+  title: string;
+  onCommit: (n: number) => void;
 }) {
   const [text, setText] = useState(String(value));
   const [editing, setEditing] = useState(false);
@@ -701,7 +747,7 @@ function IntervalInput({
     if (!editing) setText(String(value));
   }, [value, editing]);
 
-  const clamp = (n: number) => Math.max(MIN_INTERVAL, Math.round(n));
+  const clamp = (n: number) => Math.max(min, Math.round(n));
 
   const commit = () => {
     setEditing(false);
@@ -722,8 +768,8 @@ function IntervalInput({
       <button
         type="button"
         disabled={disabled}
-        onClick={() => step(-STEP)}
-        title="decrease interval"
+        onClick={() => step(-stepSize)}
+        title="decrease"
       >
         −
       </button>
@@ -739,19 +785,19 @@ function IntervalInput({
           if (e.key === "Enter") (e.target as HTMLInputElement).blur();
           else if (e.key === "ArrowUp") {
             e.preventDefault();
-            step(STEP);
+            step(stepSize);
           } else if (e.key === "ArrowDown") {
             e.preventDefault();
-            step(-STEP);
+            step(-stepSize);
           }
         }}
-        title="poll interval (ms); applies on Enter or blur"
+        title={title}
       />
       <button
         type="button"
         disabled={disabled}
-        onClick={() => step(STEP)}
-        title="increase interval"
+        onClick={() => step(stepSize)}
+        title="increase"
       >
         +
       </button>

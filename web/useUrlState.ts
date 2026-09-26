@@ -13,6 +13,7 @@ export interface UrlSettings {
   sort: string;
   interval: number;
   auto: boolean;
+  minColWidth: number;
 }
 
 /** Read any settings present in the URL query at load time. Missing keys → null. */
@@ -31,6 +32,8 @@ export function readUrlSettings(): Partial<UrlSettings> {
   if (interval && /^\d+$/.test(interval)) out.interval = Number(interval);
   const auto = q.get("auto");
   if (auto === "0" || auto === "1") out.auto = auto === "1";
+  const minColWidth = q.get("minColWidth");
+  if (minColWidth && /^\d+$/.test(minColWidth)) out.minColWidth = Number(minColWidth);
   return out;
 }
 
@@ -45,6 +48,7 @@ export function useUrlSync(settings: UrlSettings): void {
     q.set("sort", settings.sort);
     q.set("interval", String(settings.interval));
     q.set("auto", settings.auto ? "1" : "0");
+    q.set("minColWidth", String(settings.minColWidth));
     const next = `${location.pathname}?${q.toString()}`;
     if (next !== location.pathname + location.search) {
       history.replaceState(null, "", next);
@@ -57,5 +61,6 @@ export function useUrlSync(settings: UrlSettings): void {
     settings.sort,
     settings.interval,
     settings.auto,
+    settings.minColWidth,
   ]);
 }

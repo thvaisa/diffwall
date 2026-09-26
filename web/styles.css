@@ -42,6 +42,7 @@ body {
   height: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
 }
 
 .repo-tabs {
@@ -52,6 +53,7 @@ body {
   background: var(--bg-header);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  flex: 0 0 auto;
 }
 
 .repo-tabs button {
@@ -88,6 +90,12 @@ body {
   justify-items: center;
 }
 
+.repo-picker-actions {
+  width: min(600px, 90vw);
+  display: flex;
+  gap: 8px;
+}
+
 .repo-picker {
   width: min(600px, 90vw);
   display: grid;
@@ -117,7 +125,9 @@ body {
 .app {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 /* ---- Toolbar ---------------------------------------------------------- */

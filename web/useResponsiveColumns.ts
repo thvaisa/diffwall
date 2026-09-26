@@ -12,8 +12,9 @@
 import { useEffect, useState } from "react";
 
 // A bit more than 80 monospace characters — the traditional terminal width —
-// plus room for the line-number gutters and padding either side.
-const MIN_COLUMN_CHARS = 96;
+// plus room for the line-number gutters and padding either side. User-adjustable
+// via the toolbar; this is only the default/fallback.
+export const DEFAULT_MIN_COLUMN_CHARS = 96;
 
 /** Width in px of one monospace character at the page's current font size. */
 function measureCharWidth(): number {
@@ -30,21 +31,25 @@ function measureCharWidth(): number {
   return width || 6.6;
 }
 
-function computeMax(): number {
-  const minColumnWidth = MIN_COLUMN_CHARS * measureCharWidth();
+function computeMax(minColumnChars: number): number {
+  const minColumnWidth = minColumnChars * measureCharWidth();
   return Math.max(1, Math.floor(window.innerWidth / minColumnWidth));
 }
 
-export function useResponsiveColumns(requested: number): number {
-  const [maxColumns, setMaxColumns] = useState(computeMax);
+export function useResponsiveColumns(
+  requested: number,
+  minColumnChars: number = DEFAULT_MIN_COLUMN_CHARS,
+): number {
+  const [maxColumns, setMaxColumns] = useState(() => computeMax(minColumnChars));
 
   useEffect(() => {
-    function onResize() {
-      setMaxColumns(computeMax());
+    function recompute() {
+      setMaxColumns(computeMax(minColumnChars));
     }
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
+    recompute();
+    window.addEventListener("resize", recompute);
+    return () => window.removeEventListener("resize", recompute);
+  }, [minColumnChars]);
 
   return Math.min(requested, maxColumns);
 }
