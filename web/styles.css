@@ -1161,6 +1161,8 @@ body {
 
 .line {
   display: flex;
+  width: fit-content;
+  min-width: 100%;
   white-space: pre;
   border-left: 2px solid transparent;
 }
