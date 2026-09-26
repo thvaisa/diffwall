@@ -1081,6 +1081,13 @@ body {
   overflow: auto;
 }
 
+/* Rows share the widest row's width so backgrounds span the whole
+   horizontal scroll range, not just the viewport. */
+.rows {
+  width: max-content;
+  min-width: 100%;
+}
+
 .full-wrap {
   position: relative;
   display: flex;
@@ -1161,8 +1168,6 @@ body {
 
 .line {
   display: flex;
-  width: fit-content;
-  min-width: 100%;
   white-space: pre;
   border-left: 2px solid transparent;
 }

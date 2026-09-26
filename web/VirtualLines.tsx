@@ -58,11 +58,13 @@ export const VirtualLines = forwardRef<VirtualLinesHandle, Props>(
           }}
           style={maxHeight ? { maxHeight } : undefined}
         >
-          <div style={{ height: window.padTop }} />
-          {slice.map((line, i) => (
-            <DiffLine key={window.start + i} line={line} interact={interact} />
-          ))}
-          <div style={{ height: window.padBottom }} />
+          <div className="rows">
+            <div style={{ height: window.padTop }} />
+            {slice.map((line, i) => (
+              <DiffLine key={window.start + i} line={line} interact={interact} />
+            ))}
+            <div style={{ height: window.padBottom }} />
+          </div>
         </div>
         {ticks.length > 0 && (
           <div

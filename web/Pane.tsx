@@ -239,48 +239,50 @@ function DiffBody({
 
   return (
     <div className="pane-body diff">
-      {file.hunks.map((h, hi) => {
-        const prev = hi > 0 ? file.hunks[hi - 1] : null;
-        const prevEndNew = prev ? lastNew(prev) : 0;
-        const thisStartNew = h.newStart;
-        const gap = thisStartNew - prevEndNew - 1;
-        const showGap = gap > 0;
-        const isOpen = expanded.has(hi);
+      <div className="rows">
+        {file.hunks.map((h, hi) => {
+          const prev = hi > 0 ? file.hunks[hi - 1] : null;
+          const prevEndNew = prev ? lastNew(prev) : 0;
+          const thisStartNew = h.newStart;
+          const gap = thisStartNew - prevEndNew - 1;
+          const showGap = gap > 0;
+          const isOpen = expanded.has(hi);
 
-        return (
-          <div key={hi}>
-            {showGap && !isOpen && (
-              <div
-                className="gap"
-                onClick={() => setExpanded((s) => new Set(s).add(hi))}
-                title="expand skipped lines"
-              >
-                ⋯ {gap} unchanged line{gap === 1 ? "" : "s"}
-              </div>
-            )}
-            {showGap && isOpen && fullByNew && (
-              <GapLines
-                lines={fullByNew}
-                fromNew={prevEndNew + 1}
-                toNew={thisStartNew - 1}
-                interact={interact}
-              />
-            )}
-            {showGap && isOpen && !fullByNew && (
-              <div className="gap loading">loading skipped lines…</div>
-            )}
-            <div className="hunk-header">{h.header}</div>
-            {h.lines.map((line, li) => (
-              <DiffLine key={li} line={line} interact={interact} />
-            ))}
+          return (
+            <div key={hi}>
+              {showGap && !isOpen && (
+                <div
+                  className="gap"
+                  onClick={() => setExpanded((s) => new Set(s).add(hi))}
+                  title="expand skipped lines"
+                >
+                  ⋯ {gap} unchanged line{gap === 1 ? "" : "s"}
+                </div>
+              )}
+              {showGap && isOpen && fullByNew && (
+                <GapLines
+                  lines={fullByNew}
+                  fromNew={prevEndNew + 1}
+                  toNew={thisStartNew - 1}
+                  interact={interact}
+                />
+              )}
+              {showGap && isOpen && !fullByNew && (
+                <div className="gap loading">loading skipped lines…</div>
+              )}
+              <div className="hunk-header">{h.header}</div>
+              {h.lines.map((line, li) => (
+                <DiffLine key={li} line={line} interact={interact} />
+              ))}
+            </div>
+          );
+        })}
+        {file.truncated && (
+          <div className="pane-note truncated">
+            diff truncated at the per-file line cap
           </div>
-        );
-      })}
-      {file.truncated && (
-        <div className="pane-note truncated">
-          diff truncated at the per-file line cap
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
