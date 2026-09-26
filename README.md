@@ -5,7 +5,8 @@
 A local, browser-based, read-only diff wall. Shows every changed file in a git
 repo as a pane, tiled across a large screen, refreshing itself while coding
 agents work. It can watch one repository or several repositories in one
-workspace.
+workspace. Line references and comments let you point an agent at exactly what
+to change next, right from the diff.
 
 Read-only: it reads git and the working tree and never writes to the repo. It is
 immune to *how* an edit was made — `sed`, a heredoc, an editor, or an agent all
