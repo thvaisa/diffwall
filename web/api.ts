@@ -5,6 +5,7 @@ import type {
   FileResponse,
   HealthResponse,
   OpenResponse,
+  StatusResponse,
   WorkspaceResponse,
 } from "../shared/types.js";
 
@@ -68,6 +69,17 @@ export async function openInVsCode(
     body: JSON.stringify({ repoId, path, line }),
   });
   return (await res.json()) as OpenResponse;
+}
+
+export async function fetchStatus(
+  repoId: string,
+  signal?: AbortSignal,
+): Promise<StatusResponse> {
+  const res = await fetch(`/api/status?repo=${encodeURIComponent(repoId)}`, {
+    signal,
+  });
+  if (!res.ok) throw new Error(`status failed: ${res.status}`);
+  return (await res.json()) as StatusResponse;
 }
 
 export async function fetchWorkspace(

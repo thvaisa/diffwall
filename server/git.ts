@@ -4,7 +4,7 @@
 // paths, always -z where the porcelain supports it.
 
 import { execFile } from "node:child_process";
-import type { RepoState } from "../shared/types.js";
+import type { CommitEntry, RepoState } from "../shared/types.js";
 
 const MAX_BUFFER = 64 * 1024 * 1024; // 64 MiB; large diffs must not truncate silently.
 
@@ -116,6 +116,7 @@ export interface RefList {
   branches: string[];
   tags: string[];
   head: string; // always available: diff against the last commit
+  commits: CommitEntry[];
 }
 
 /**
@@ -143,7 +144,29 @@ export async function listRefs(cwd: string): Promise<RefList> {
           .map((s) => s.trim())
           .filter((s) => s !== "")
       : [];
-  return { branches: split(branchesRes), tags: split(tagsRes), head: "HEAD" };
+  return {
+    branches: split(branchesRes),
+    tags: split(tagsRes),
+    head: "HEAD",
+    commits: await recentCommits(cwd, 5),
+  };
+}
+
+/** Most recent commits reachable from HEAD, newest first. Empty on an empty repo. */
+export async function recentCommits(cwd: string, n: number): Promise<CommitEntry[]> {
+  const r = await git(cwd, ["log", `-n${n}`, "--format=%h\x1f%s"]);
+  if (r.code !== 0) return [];
+  return r.stdout
+    .toString("utf8")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line !== "")
+    .map((line) => {
+      const sep = line.indexOf("\x1f");
+      return sep < 0
+        ? { hash: line, subject: "" }
+        : { hash: line.slice(0, sep), subject: line.slice(sep + 1) };
+    });
 }
 
 // ---- Raw diff / numstat / name-status collection ------------------------------
@@ -253,6 +276,20 @@ export function parseNameStatusZ(text: string): NameStatusEntry[] {
     }
   }
   return out;
+}
+
+/**
+ * Cheap dirty check for tab indicators: true if the worktree has any tracked
+ * change or untracked (non-ignored) file relative to HEAD. A single
+ * `--porcelain` call is much cheaper than a full diff/numstat.
+ */
+export async function isDirty(cwd: string): Promise<boolean> {
+  const r = await gitOrThrow(cwd, [
+    "status",
+    "--porcelain",
+    "--untracked-files=normal",
+  ]);
+  return r.stdout.toString("utf8").trim() !== "";
 }
 
 /** Untracked, non-ignored files. */

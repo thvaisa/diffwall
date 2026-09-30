@@ -131,11 +131,17 @@ export interface RepositoryInfo {
   relativePath: string;
 }
 
+export interface CommitEntry {
+  hash: string;
+  subject: string;
+}
+
 export interface RefsResponse {
   repoId: string;
   branches: string[];
   tags: string[];
   head: string;
+  commits: CommitEntry[];
 }
 
 export interface OpenRequest {
@@ -157,4 +163,10 @@ export interface WorkspaceResponse {
   launchRoot: string;
   setupRequired: boolean;
   repositories: RepositoryInfo[];
+}
+
+/** Cheap "does this repo have changes" check, for tab indicators. */
+export interface StatusResponse {
+  repoId: string;
+  dirty: boolean;
 }

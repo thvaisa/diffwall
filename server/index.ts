@@ -13,9 +13,10 @@ import type {
   HealthResponse,
   OpenResponse,
   RefsResponse,
+  StatusResponse,
   WorkspaceResponse,
 } from "../shared/types.js";
-import { listRefs, refExists } from "./git.js";
+import { isDirty, listRefs, refExists } from "./git.js";
 import { buildDiffResponse, buildFileResponse, type BuildOptions } from "./buildDiff.js";
 import {
   createRepositoryRegistry,
@@ -254,6 +255,13 @@ async function handle(
   }
   const root = repo.root;
   const repoId = repo.info.id;
+
+  if (path === "/api/status") {
+    const dirty = await isDirty(root);
+    const body: StatusResponse = { repoId, dirty };
+    sendJson(res, 200, body);
+    return;
+  }
 
   if (path === "/api/refs") {
     const refs = await listRefs(root);

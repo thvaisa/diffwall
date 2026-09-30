@@ -10,6 +10,9 @@ export default defineConfig({
     outDir: "../dist/web",
     emptyOutDir: true,
     target: "es2022",
+    // mermaid's per-diagram-type chunks (lazy-loaded on demand, not part of
+    // the initial bundle) routinely exceed Vite's default 500kB warning.
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     port: 5173,

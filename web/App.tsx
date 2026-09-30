@@ -101,9 +101,11 @@ export function App() {
             </button>
           );
         })}
-        <button className="workspace-change" onClick={() => setSelected([])}>
-          choose repos
-        </button>
+        {workspace.setupRequired && (
+          <button className="workspace-change" onClick={() => setSelected([])}>
+            choose repos
+          </button>
+        )}
       </div>
       <RepoWall
         key={active}
@@ -544,6 +546,11 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
             onChange={setBase}
             inputRef={baseInputRef}
           />
+          {poll.loading && (
+            <span className="base-loading" title="recomputing diff…" aria-label="loading">
+              ⟳
+            </span>
+          )}
         </label>
 
         <label>
