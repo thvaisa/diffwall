@@ -11,6 +11,7 @@ const KEYS: [string, string][] = [
   ["j / k", "jump to next / previous changed region (full view)"],
   ["J / K", "focus next / previous pane"],
   ["1 – 6", "set column count"],
+  ["← / →", "kanban: scroll one column left / right"],
   ["/", "focus the base input"],
   ["?", "show / hide this help"],
 ];

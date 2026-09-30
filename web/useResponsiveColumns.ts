@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 export const DEFAULT_MIN_COLUMN_CHARS = 96;
 
 /** Width in px of one monospace character at the page's current font size. */
-function measureCharWidth(): number {
+export function measureCharWidth(): number {
   const probe = document.createElement("span");
   probe.style.fontFamily = "var(--font-mono)";
   probe.style.fontSize = "11px";

@@ -16,9 +16,11 @@ import { NotePad } from "./NotePad.js";
 import { useDiffPoll } from "./useDiffPoll.js";
 import {
   DEFAULT_MIN_COLUMN_CHARS,
+  measureCharWidth,
   useResponsiveColumns,
 } from "./useResponsiveColumns.js";
 import { useColumnWidths } from "./useColumnWidths.js";
+import { availableKanbanHeight, useKanban } from "./useKanban.js";
 import { usePaneHeights } from "./usePaneHeights.js";
 import { readUrlSettings, useUrlSync } from "./useUrlState.js";
 import { BaseSelect } from "./BaseSelect.js";
@@ -282,6 +284,12 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
   const [treeOpen, setTreeOpen] = useState(() =>
     loadJson<boolean>(`${repoId}:treeOpen`, false),
   );
+  const [kanban, setKanban] = useState(() =>
+    loadJson<boolean>(`${repoId}:kanban`, false),
+  );
+  const [kanbanMaxHeight, setKanbanMaxHeight] = useState(() =>
+    loadJson<number>(`${repoId}:kanbanMaxHeight`, DEFAULT_KANBAN_MAX_HEIGHT),
+  );
   const [hiddenDirs, setHiddenDirs] = useState<Set<string>>(
     () => new Set(loadJson<string[]>(`${repoId}:hiddenDirs`, [])),
   );
@@ -310,6 +318,11 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
   useEffect(() => saveJson(`${repoId}:sort`, sortMode), [repoId, sortMode]);
   useEffect(() => saveJson(`${repoId}:autoPoll`, autoPoll), [repoId, autoPoll]);
   useEffect(() => saveJson(`${repoId}:treeOpen`, treeOpen), [repoId, treeOpen]);
+  useEffect(() => saveJson(`${repoId}:kanban`, kanban), [repoId, kanban]);
+  useEffect(
+    () => saveJson(`${repoId}:kanbanMaxHeight`, kanbanMaxHeight),
+    [repoId, kanbanMaxHeight],
+  );
   useEffect(
     () => saveJson(`${repoId}:hiddenDirs`, [...hiddenDirs]),
     [repoId, hiddenDirs],
@@ -449,6 +462,19 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
     [orderedPaths, focused],
   );
 
+  const wallRef = useRef<HTMLDivElement | null>(null);
+  const kanbanColumnPx = useMemo(
+    () => Math.round(minColumnChars * measureCharWidth()),
+    [minColumnChars],
+  );
+  const kanbanLayout = useKanban(
+    kanban,
+    orderedFiles,
+    kanbanMaxHeight,
+    kanbanColumnPx,
+    wallRef,
+  );
+
   const baseInputRef = useRef<HTMLInputElement | null>(null);
   const navRef = useRef<{ path: string; nav: PaneNav } | null>(null);
   const registerNav = useCallback((path: string, nav: PaneNav | null) => {
@@ -459,7 +485,12 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const t = e.target as HTMLElement;
-      if (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA")
+      const isCheckbox = t instanceof HTMLInputElement && t.type === "checkbox";
+      if (
+        (t.tagName === "INPUT" && !isCheckbox) ||
+        t.tagName === "SELECT" ||
+        t.tagName === "TEXTAREA"
+      )
         return;
       switch (e.key) {
         case "a":
@@ -508,6 +539,17 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
           if (zoomed) setZoomed(null);
           else setHelpOpen(false);
           break;
+        case "ArrowLeft":
+        case "ArrowRight":
+          if (kanban && wallRef.current) {
+            e.preventDefault();
+            const step = kanbanLayout.columnWidth + 8;
+            wallRef.current.scrollBy({
+              left: (e.key === "ArrowRight" ? 1 : -1) * step,
+              behavior: "smooth",
+            });
+          }
+          break;
         default:
           if (e.key >= "1" && e.key <= "6") setColumnCount(Number(e.key));
       }
@@ -524,7 +566,30 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
     autoPoll,
     zoomed,
     toggleZoom,
+    kanban,
+    kanbanLayout.columnWidth,
   ]);
+
+  const renderPane = (file: FileDiff, base: string) => (
+    <Pane
+      repoId={repoId}
+      key={file.path}
+      file={file}
+      base={base}
+      mode={modeFor(file.path)}
+      onToggleMode={toggleMode}
+      focused={focused === file.path}
+      onFocus={setFocused}
+      tray={tray}
+      flash={changed.get(file.path) ?? null}
+      height={paneHeights.get(file.path)}
+      onSetHeight={paneHeights.set}
+      onClearHeight={paneHeights.clear}
+      onRegisterNav={registerNav}
+      zoomed={zoomed === file.path}
+      onToggleZoom={toggleZoom}
+    />
+  );
 
   return (
     <div className="app">
@@ -553,37 +618,39 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
           )}
         </label>
 
-        <label>
-          columns
-          <span
-            className="interval-input"
-            onWheel={(e) => {
-              e.preventDefault();
-              setColumnCount((c) =>
-                clampColumns(c + (e.deltaY > 0 ? -1 : 1)),
-              );
-            }}
-            title="scroll to change column count"
-          >
-            <button
-              type="button"
-              disabled={columnCount <= MIN_COLUMNS}
-              onClick={() => setColumnCount((c) => clampColumns(c - 1))}
-              title="fewer columns"
+        {!kanban && (
+          <label>
+            columns
+            <span
+              className="interval-input"
+              onWheel={(e) => {
+                e.preventDefault();
+                setColumnCount((c) =>
+                  clampColumns(c + (e.deltaY > 0 ? -1 : 1)),
+                );
+              }}
+              title="scroll to change column count"
             >
-              −
-            </button>
-            <span className="interval-value">{columnCount}</span>
-            <button
-              type="button"
-              disabled={columnCount >= MAX_COLUMNS}
-              onClick={() => setColumnCount((c) => clampColumns(c + 1))}
-              title="more columns"
-            >
-              +
-            </button>
-          </span>
-        </label>
+              <button
+                type="button"
+                disabled={columnCount <= MIN_COLUMNS}
+                onClick={() => setColumnCount((c) => clampColumns(c - 1))}
+                title="fewer columns"
+              >
+                −
+              </button>
+              <span className="interval-value">{columnCount}</span>
+              <button
+                type="button"
+                disabled={columnCount >= MAX_COLUMNS}
+                onClick={() => setColumnCount((c) => clampColumns(c + 1))}
+                title="more columns"
+              >
+                +
+              </button>
+            </span>
+          </label>
+        )}
 
         <label title="minimum column width (in characters) before columns auto-shrink to fit the window">
           min width
@@ -596,6 +663,34 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
           />
           ch
         </label>
+
+        <label title="lay files out kanban-style: pack files into columns no taller than the window (or max height), scrolling sideways for more columns. A single file taller than that gets a column to itself and scrolls inside it.">
+          <input
+            type="checkbox"
+            checked={kanban}
+            onChange={(e) => {
+              const on = e.target.checked;
+              if (on && wallRef.current)
+                setKanbanMaxHeight(availableKanbanHeight(wallRef.current));
+              setKanban(on);
+            }}
+          />
+          kanban
+        </label>
+
+        {kanban && (
+          <label title="max column height (px) before a new column starts; a single file taller than this scrolls inside its pane">
+            max height
+            <SteppedNumberInput
+              value={kanbanMaxHeight}
+              min={KANBAN_MAX_HEIGHT_FLOOR}
+              step={KANBAN_MAX_HEIGHT_STEP}
+              onCommit={setKanbanMaxHeight}
+              title="max column height (px); applies on Enter or blur"
+            />
+            px
+          </label>
+        )}
 
         <label>
           view
@@ -704,10 +799,35 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
             onClose={() => setTreeOpen(false)}
           />
         )}
-        <div className="wall">
+        <div className="wall" ref={wallRef}>
         {data && data.files.length === 0 ? (
           <div className="empty-state">
             No changes against <code>{data.base}</code>.
+          </div>
+        ) : kanban ? (
+          <div
+            className="kanban"
+            ref={kanbanLayout.containerRef}
+            style={
+              {
+                width: kanbanLayout.width,
+                height: kanbanLayout.height,
+                "--kanban-cap": `${kanbanLayout.cap}px`,
+              } as React.CSSProperties
+            }
+          >
+            {kanbanLayout.items.map(({ file, x, y }) => (
+              <div
+                key={file.path}
+                className="kanban-item"
+                style={{
+                  width: kanbanLayout.columnWidth,
+                  transform: `translate(${x}px, ${y}px)`,
+                }}
+              >
+                {renderPane(file, data!.base)}
+              </div>
+            ))}
           </div>
         ) : (
           <div className="columns" ref={columnWidths.containerRef}>
@@ -719,26 +839,7 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
                     flex: `${columnWidths.ratios[ci] ?? 1 / effectiveColumnCount} 1 0`,
                   }}
                 >
-                  {col.map((file) => (
-                    <Pane
-                      repoId={repoId}
-                      key={file.path}
-                      file={file}
-                      base={data!.base}
-                      mode={modeFor(file.path)}
-                      onToggleMode={toggleMode}
-                      focused={focused === file.path}
-                      onFocus={setFocused}
-                      tray={tray}
-                      flash={changed.get(file.path) ?? null}
-                      height={paneHeights.get(file.path)}
-                      onSetHeight={paneHeights.set}
-                      onClearHeight={paneHeights.clear}
-                      onRegisterNav={registerNav}
-                      zoomed={zoomed === file.path}
-                      onToggleZoom={toggleZoom}
-                    />
-                  ))}
+                  {col.map((file) => renderPane(file, data!.base))}
                 </div>
                 {ci < columns.length - 1 && (
                   <div
@@ -801,6 +902,13 @@ const INTERVAL_STEP = 250;
 // chrome (line-number gutter, padding) stops fitting.
 const MIN_COLUMN_CHARS_FLOOR = 40;
 const MIN_COLUMN_CHARS_STEP = 8;
+
+// Kanban mode: panes flow top-to-bottom into a column of at most this height
+// (px, never taller than the window), then continue in the next column to the
+// right; the board scrolls sideways.
+const DEFAULT_KANBAN_MAX_HEIGHT = 2000;
+const KANBAN_MAX_HEIGHT_FLOOR = 150;
+const KANBAN_MAX_HEIGHT_STEP = 50;
 
 // A plain text box (no native number spinner — its arrows fired onChange but
 // never committed) flanked by explicit − / + steppers that apply immediately.

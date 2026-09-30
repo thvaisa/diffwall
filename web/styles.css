@@ -893,6 +893,20 @@ body {
   min-width: 0;
 }
 
+/* Kanban mode: panes placed absolutely by useKanban in one row of columns that
+   scrolls sideways. A pane is capped at the column height and scrolls inside. */
+.kanban {
+  position: relative;
+}
+.kanban-item {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+.kanban-item > .pane {
+  max-height: var(--kanban-cap);
+}
+
 .empty-state {
   color: var(--text-dim);
   padding: 40px;
