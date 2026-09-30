@@ -59,12 +59,27 @@ body {
 .repo-tabs button {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .repo-tabs button.active {
   color: var(--text);
   border-color: var(--accent);
   background: var(--bg-pane);
+}
+
+.repo-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+  flex: 0 0 auto;
+}
+
+.repo-tabs button.has-changes .repo-tab-dot {
+  background: var(--add-bar);
 }
 
 .repo-tabs .workspace-change {
@@ -483,6 +498,30 @@ body {
   border-color: var(--border-strong);
 }
 
+/* ---- Context menu ------------------------------------------------------ */
+
+.context-menu {
+  position: fixed;
+  min-width: 160px;
+  background: var(--bg-pane);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  z-index: 300;
+  font-size: 12px;
+}
+.context-menu-item {
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.context-menu-item:hover {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ---- Help overlay ---------------------------------------------------- */
 
 .help-overlay {
@@ -601,6 +640,16 @@ body {
   border-left: none;
   border-right: none;
   font-family: var(--font-mono);
+}
+.interval-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-mono);
+  color: var(--text);
 }
 .interval-input button {
   background: var(--bg);

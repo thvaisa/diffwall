@@ -6,6 +6,8 @@
 import { useState } from "react";
 import type { FileDiff } from "../shared/types.js";
 import { buildTree, type TreeNode } from "./fileTree.js";
+import { copyText } from "./references.js";
+import { openContextMenu } from "./ContextMenu.js";
 
 const STATUS_DOT: Record<string, string> = {
   modified: "status-modified",
@@ -85,6 +87,18 @@ function TreeRow({
         style={pad}
         title={node.path}
         onClick={() => onPickFile(node.path)}
+        onContextMenu={(e) =>
+          openContextMenu(e, [
+            {
+              label: "Copy relative path",
+              onSelect: () => copyText(node.path),
+            },
+            {
+              label: "Copy absolute path",
+              onSelect: () => copyText(node.file.absPath),
+            },
+          ])
+        }
       >
         <span className={`status-dot ${STATUS_DOT[node.file.status] ?? ""}`} />
         <span className="tree-name">{node.name}</span>

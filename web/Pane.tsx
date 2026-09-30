@@ -12,6 +12,8 @@ import { useLineInteract } from "./useLineInteract.js";
 import { VirtualLines, type VirtualLinesHandle } from "./VirtualLines.js";
 import { MarkdownView } from "./MarkdownView.js";
 import type { RefTray } from "./references.js";
+import { copyText } from "./references.js";
+import { openContextMenu } from "./ContextMenu.js";
 
 /** Handlers a focused pane registers so App's j/k keys can drive it. */
 export interface PaneNav {
@@ -138,7 +140,22 @@ function PaneImpl({
           title="collapse / expand"
         >
           <span className={`status-dot status-${file.status}`} />
-          <span className="path" title={file.path}>
+          <span
+            className="path"
+            title={file.path}
+            onContextMenu={(e) =>
+              openContextMenu(e, [
+                {
+                  label: "Copy relative path",
+                  onSelect: () => copyText(file.path),
+                },
+                {
+                  label: "Copy absolute path",
+                  onSelect: () => copyText(file.absPath),
+                },
+              ])
+            }
+          >
             {file.oldPath && (
               <>
                 <span className="old-path">{file.oldPath}</span>

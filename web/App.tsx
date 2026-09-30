@@ -25,8 +25,9 @@ import { BaseSelect } from "./BaseSelect.js";
 import { HelpOverlay } from "./HelpOverlay.js";
 import { FileTree } from "./FileTree.js";
 import { isHidden } from "./fileTree.js";
-import { fetchWorkspace } from "./api.js";
+import { fetchStatus, fetchWorkspace } from "./api.js";
 import type { RepositoryInfo } from "../shared/types.js";
+import { ContextMenuHost } from "./ContextMenu.js";
 
 export function App() {
   const [workspace, setWorkspace] = useState<{
@@ -62,6 +63,8 @@ export function App() {
     }
   }, [workspace, selected]);
 
+  const dirtyTabs = useTabDirtyStatus(selected);
+
   if (!workspace) {
     return <div className="workspace-message">loading workspace…</div>;
   }
@@ -83,13 +86,17 @@ export function App() {
         {selected.map((id) => {
           const repo = workspace.repositories.find((r) => r.id === id);
           if (!repo) return null;
+          const isActive = id === active;
           return (
             <button
               key={id}
-              className={id === active ? "active" : ""}
+              className={[isActive ? "active" : "", dirtyTabs.has(id) ? "has-changes" : ""]
+                .filter(Boolean)
+                .join(" ")}
               onClick={() => setSelected((ids) => [id, ...ids.filter((x) => x !== id)])}
               title={repo.relativePath || repo.label}
             >
+              <span className="repo-tab-dot" aria-hidden="true" />
               {repo.label}
             </button>
           );
@@ -107,6 +114,52 @@ export function App() {
       />
     </div>
   );
+}
+
+/** Poll each selected repo's cheap status endpoint to light up a dirty-tab
+ *  indicator. Lazy on purpose: every repo is checked on the same slow
+ *  interval, including the active one, whose real diff poll is the source of
+ *  truth for its own pane but doesn't update this dot. */
+const TAB_STATUS_INTERVAL_MS = 8000;
+
+function useTabDirtyStatus(repoIds: string[]): Set<string> {
+  const [dirty, setDirty] = useState<Set<string>>(new Set());
+  const idsKey = repoIds.join(",");
+
+  useEffect(() => {
+    if (!idsKey) {
+      setDirty(new Set());
+      return;
+    }
+    const ids = idsKey.split(",");
+    let stopped = false;
+    const ac = new AbortController();
+
+    const poll = async () => {
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const status = await fetchStatus(id, ac.signal);
+            return status.dirty ? id : null;
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (stopped) return;
+      setDirty(new Set(results.filter((id): id is string => id !== null)));
+    };
+
+    void poll();
+    const timer = window.setInterval(poll, TAB_STATUS_INTERVAL_MS);
+    return () => {
+      stopped = true;
+      ac.abort();
+      window.clearInterval(timer);
+    };
+  }, [idsKey]);
+
+  return dirty;
 }
 
 function selectionStorageKey(launchRoot: string): string {
@@ -495,16 +548,34 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
 
         <label>
           columns
-          <select
-            value={columnCount}
-            onChange={(e) => setColumnCount(Number(e.target.value))}
+          <span
+            className="interval-input"
+            onWheel={(e) => {
+              e.preventDefault();
+              setColumnCount((c) =>
+                clampColumns(c + (e.deltaY > 0 ? -1 : 1)),
+              );
+            }}
+            title="scroll to change column count"
           >
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+            <button
+              type="button"
+              disabled={columnCount <= MIN_COLUMNS}
+              onClick={() => setColumnCount((c) => clampColumns(c - 1))}
+              title="fewer columns"
+            >
+              −
+            </button>
+            <span className="interval-value">{columnCount}</span>
+            <button
+              type="button"
+              disabled={columnCount >= MAX_COLUMNS}
+              onClick={() => setColumnCount((c) => clampColumns(c + 1))}
+              title="more columns"
+            >
+              +
+            </button>
+          </span>
         </label>
 
         <label title="minimum column width (in characters) before columns auto-shrink to fit the window">
@@ -703,6 +774,7 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
           </div>
         );
       })()}
+      <ContextMenuHost />
     </div>
   );
 }
@@ -711,6 +783,10 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
 function FragmentColumn({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
+
+const MIN_COLUMNS = 1;
+const MAX_COLUMNS = 6;
+const clampColumns = (n: number) => Math.min(MAX_COLUMNS, Math.max(MIN_COLUMNS, n));
 
 const MIN_INTERVAL = 250;
 const INTERVAL_STEP = 250;
