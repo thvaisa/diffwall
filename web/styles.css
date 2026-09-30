@@ -708,6 +708,12 @@ body {
 .base-loading {
   display: inline-block;
   color: var(--text-dim);
+  opacity: 0;
+  margin-right: 0.35em;
+}
+
+.base-loading.on {
+  opacity: 1;
   animation: base-loading-spin 0.8s linear infinite;
 }
 

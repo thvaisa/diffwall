@@ -166,6 +166,24 @@ function useTabDirtyStatus(repoIds: string[]): Set<string> {
   return dirty;
 }
 
+/** True while the window has a non-collapsed text selection. Used to pause
+ *  diff polling so a poll landing mid-selection (e.g. while picking lines to
+ *  attach a note to) doesn't re-render the pane and clear it. */
+function useTextSelectionActive(): boolean {
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    const onChange = () => {
+      const sel = window.getSelection();
+      setActive(!!sel && !sel.isCollapsed && sel.rangeCount > 0);
+    };
+    document.addEventListener("selectionchange", onChange);
+    return () => document.removeEventListener("selectionchange", onChange);
+  }, []);
+
+  return active;
+}
+
 function selectionStorageKey(launchRoot: string): string {
   return `diffwall:selected-repositories:${launchRoot}`;
 }
@@ -368,7 +386,15 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
     [repoId, base, context, untracked],
   );
 
-  const [poll, controls] = useDiffPoll(params, intervalMs, frozen, autoPoll);
+  // Auto-freeze while the user is selecting text (e.g. to add a note) so a
+  // poll landing mid-selection doesn't re-render the pane and wipe it out.
+  const selecting = useTextSelectionActive();
+  const [poll, controls] = useDiffPoll(
+    params,
+    intervalMs,
+    frozen || selecting,
+    autoPoll,
+  );
   const { data, connected, lastUpdated, changed, pending, slow } = poll;
 
   // If the zoomed file vanishes from the diff (reverted, staged away), drop
@@ -611,11 +637,6 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
             onChange={setBase}
             inputRef={baseInputRef}
           />
-          {poll.loading && (
-            <span className="base-loading" title="recomputing diff…" aria-label="loading">
-              ⟳
-            </span>
-          )}
         </label>
 
         {!kanban && (
@@ -762,7 +783,7 @@ function RepoWall({ repoId, repoLabel }: { repoId: string; repoLabel: string }) 
             <span className="del">−{data.totals.removed}</span>
           </span>
         )}
-        <LastUpdated at={lastUpdated} />
+        <LastUpdated at={lastUpdated} loading={poll.loading} />
         <button
           className="help-btn"
           onClick={() => setHelpOpen((v) => !v)}
@@ -997,13 +1018,22 @@ function SteppedNumberInput({
 }
 
 // Live-updating "updated Ns ago" label.
-function LastUpdated({ at }: { at: number | null }) {
+function LastUpdated({ at, loading }: { at: number | null; loading: boolean }) {
   const [, force] = useState(0);
   useEffect(() => {
     const id = window.setInterval(() => force((n) => n + 1), 1000);
     return () => window.clearInterval(id);
   }, []);
-  if (at == null) return null;
-  const secs = Math.max(0, Math.round((Date.now() - at) / 1000));
-  return <span className="last-updated">updated {secs}s ago</span>;
+  return (
+    <span className="last-updated">
+      <span
+        className={`base-loading${loading ? " on" : ""}`}
+        title="recomputing diff…"
+        aria-label="loading"
+      >
+        ⟳
+      </span>
+      {at != null && `updated ${Math.max(0, Math.round((Date.now() - at) / 1000))}s ago`}
+    </span>
+  );
 }
